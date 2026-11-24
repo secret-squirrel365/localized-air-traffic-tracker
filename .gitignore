@@ -16,3 +16,4 @@ tracker_echo/libraries/
 # IDE
 .idea/
 build-log.txt
+maps/
