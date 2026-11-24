@@ -20,6 +20,8 @@
 
 // ─── Sky Dial options ────────────────────────────────
 #define SKYDIAL_WEB_TRACK  0   // 1 = ask overheadtracker.com/track every refresh (pauses the screen)
+#define SKYDIAL_RANGE_MI   15  // radar range in miles (fixed - no GEO button)
+#define SKYDIAL_GEO_BTN    0   // 1 = bring back the GEO range button
 #define SKYDIAL_BG_NET     1   // 1 = download on the second core (no screen pauses)
 #define SKYDIAL_SWEEP      1   // 1 = spinning radar sweep (uses ~26 KB of memory)
 #define SKYDIAL_HEARTBEAT  0   // 1 = send stats + town name to the Echo creator's server every minute
@@ -90,7 +92,11 @@
   #define NAV_BTN_GAP 4
   #define CFG_BTN_X1  (W - NAV_BTN_W)
   #define GEO_BTN_X1  (CFG_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)
+  #if SKYDIAL_GEO_BTN
   #define WX_BTN_X1   (GEO_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)
+  #else
+  #define WX_BTN_X1   (CFG_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)   // Sky Dial: GEO removed
+  #endif
   #define RDR_BTN_X1  (WX_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)   // Sky Dial: radar button
   #define LST_BTN_X1  (RDR_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)  // Sky Dial: list button
 #endif

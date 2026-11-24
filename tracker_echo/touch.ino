@@ -104,6 +104,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       return;
     }
 
+#if SKYDIAL_GEO_BTN
     // GEO button (disabled in tracking mode)
     if (tx >= GEO_BTN_X1 && tx < GEO_BTN_X1 + NAV_BTN_W) {
       if (trackingMode) return;
@@ -111,7 +112,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       tft.setTextColor(C_BG, C_AMBER);
       tft.setTextSize(2);
       tft.setCursor(GEO_BTN_X1 + 8, NAV_Y + 10);
-      tft.print(geoIndex == 0 ? "3mi" : geoIndex == 1 ? "6mi" : "12mi");
+      tft.printf("%dmi", (int)(GEOFENCE_KM * 0.621371f + 0.5f));
       // Sky Dial: removed 100 ms pause for snappier buttons
       geoIndex = (geoIndex + 1) % GEO_COUNT;
       GEOFENCE_KM = GEO_PRESETS[geoIndex];
@@ -127,6 +128,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       }
       return;
     }
+#endif
 
     // CFG button (two-tap confirmation — reboot is destructive)
     if (tx >= CFG_BTN_X1 && tx < CFG_BTN_X1 + NAV_BTN_W) {

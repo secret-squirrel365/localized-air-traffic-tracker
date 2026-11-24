@@ -62,14 +62,17 @@ void drawNavBar() {
   tft.setCursor(WX_BTN_X1 + (NAV_BTN_W - 24) / 2, NAV_Y + 10);
   tft.print("WX");
 
+#if SKYDIAL_GEO_BTN
   // GEO button
-  const char* geoLabels[] = {"3mi", "6mi", "12mi"};   // Sky Dial: miles
+  char geoLbl[8]; snprintf(geoLbl, sizeof(geoLbl), "%dmi", (int)(GEOFENCE_KM * 0.621371f + 0.5f));
+  const char* geoLabels[] = {geoLbl};
   tft.fillRect(GEO_BTN_X1, NAV_Y + 2, NAV_BTN_W, NAV_BTN_H, C_DIMMER);
   tft.setTextColor(C_AMBER, C_DIMMER);
   tft.setTextSize(2);
   int geoW = strlen(geoLabels[geoIndex]) * 12;
   tft.setCursor(GEO_BTN_X1 + (NAV_BTN_W - geoW) / 2, NAV_Y + 10);
   tft.print(geoLabels[geoIndex]);
+#endif
 
   // CFG button
   uint16_t cfgBg = isFetching ? C_RED : C_DIMMER;
@@ -267,13 +270,13 @@ static void renderDashSpeed(const Flight& f, int dashY, int colW) {
   if (f.speed > 0) {
     char spdBuf[16];
     if (BP_DASH_TS == 1) {
-      snprintf(spdBuf, sizeof(spdBuf), "%dKT", f.speed);
+      snprintf(spdBuf, sizeof(spdBuf), "%dMPH", (int)(f.speed * 1.15078f));   // Sky Dial: mph
       tft.print(spdBuf);
     } else {
-      snprintf(spdBuf, sizeof(spdBuf), "%d", f.speed);
+      snprintf(spdBuf, sizeof(spdBuf), "%d", (int)(f.speed * 1.15078f));
       tft.print(spdBuf);
       tft.setTextSize(1);
-      tft.print(" KT");
+      tft.print(" MPH");
     }
   } else { tft.print("---"); }
 }
@@ -289,16 +292,17 @@ static void renderDashDist(const Flight& f, int dashY, int colW) {
   tft.setCursor(colW * 3 + BP_DASH_X_OFF, dashY + BP_DASH_VAL_Y);
   if (f.dist > 0) {
     char distBuf[16];
+    float mi = f.dist * 0.621371f;   // Sky Dial: miles
     if (BP_DASH_TS == 1) {
-      if (f.dist >= 10.0f) snprintf(distBuf, sizeof(distBuf), "%.0fKM", f.dist);
-      else                  snprintf(distBuf, sizeof(distBuf), "%.1f", f.dist);
+      if (mi >= 10.0f) snprintf(distBuf, sizeof(distBuf), "%.0fMI", mi);
+      else              snprintf(distBuf, sizeof(distBuf), "%.1f", mi);
       tft.print(distBuf);
     } else {
-      if (f.dist >= 10.0f) snprintf(distBuf, sizeof(distBuf), "%.0f", f.dist);
-      else                  snprintf(distBuf, sizeof(distBuf), "%.1f", f.dist);
+      if (mi >= 10.0f) snprintf(distBuf, sizeof(distBuf), "%.0f", mi);
+      else              snprintf(distBuf, sizeof(distBuf), "%.1f", mi);
       tft.print(distBuf);
       tft.setTextSize(1);
-      tft.print(" KM");
+      tft.print(" MI");
     }
   } else { tft.print("---"); }
 }
@@ -558,7 +562,7 @@ void bootSequence() {
   bootLine("PROXY TARGET",   buf,                            C_AMBER,  25);
   snprintf(buf, sizeof(buf), "%.4f, %.4f", HOME_LAT, HOME_LON);
   bootLine("HOME COORDS",    buf,                            C_AMBER,  25);
-  snprintf(buf, sizeof(buf), "%.0f KM RADIUS", GEOFENCE_KM);
+  snprintf(buf, sizeof(buf), "%.0f MI RADIUS", GEOFENCE_KM * 0.621371f);
   bootLine("GEOFENCE",       buf,                            C_AMBER,  20);
   bootLine("ADS-B PIPELINE", "DECODER READY",                C_GREEN,  35);
   snprintf(buf, sizeof(buf), "%d SEC AUTO-REFRESH", REFRESH_SECS);

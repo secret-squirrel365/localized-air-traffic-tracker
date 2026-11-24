@@ -414,7 +414,7 @@ static void drawRadarPanel(bool full) {
     tft.setCursor(x, y + 40); tft.print("CLEAR SKIES");
     tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
     tft.setCursor(x, y + 64); tft.print("No planes in range.");
-    tft.setCursor(x, y + 76); tft.print("Tap GEO for more range.");
+    tft.setCursor(x, y + 76); tft.print("Checking every 10 seconds.");
     return;
   }
   const Flight& f = flights[flightIndex];

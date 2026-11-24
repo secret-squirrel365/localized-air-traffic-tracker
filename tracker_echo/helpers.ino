@@ -100,7 +100,9 @@ float haversineKm(float lat1, float lon1, float lat2, float lon2) {
 }
 
 int apiRadiusNm() {
-  return (int)ceilf((GEOFENCE_KM / 1.852f) * 4.0f);
+  // Sky Dial: ask for 1.25x the screen range (was 4x = ~53 nm at 15 mi, which
+  // could overflow the 20 KB download buffer near a busy airport)
+  return (int)ceilf((GEOFENCE_KM / 1.852f) * 1.25f);
 }
 
 void formatAlt(int alt, char* buf, int len) {

@@ -63,7 +63,7 @@ const int   PROXY_PORT = 443;
 // ─── Location (defaults — overridden by NVS / config.txt) ─
 float HOME_LAT     = 0.0f;
 float HOME_LON     = 0.0f;
-float GEOFENCE_KM  = 6 * 1.609344f;   // Sky Dial: 6 miles
+float GEOFENCE_KM  = SKYDIAL_RANGE_MI * 1.609344f;   // Sky Dial: fixed range
 int   ALT_FLOOR_FT = 500;
 char  LOCATION_NAME[32] = "NOT SET";
 char  HOME_QUERY[128]   = "";
@@ -75,9 +75,9 @@ bool sdAvailable = false;
 #endif
 
 // ─── Geofence presets ─────────────────────────────────
-// Sky Dial: range steps in miles (3, 6, 12 mi), stored as km for the math
-const float GEO_PRESETS[] = {3 * 1.609344f, 6 * 1.609344f, 12 * 1.609344f};
-const int   GEO_COUNT     = 3;
+// Sky Dial: one fixed range (SKYDIAL_RANGE_MI in config.h), stored as km for the math
+const float GEO_PRESETS[] = {SKYDIAL_RANGE_MI * 1.609344f};
+const int   GEO_COUNT     = 1;
 int         geoIndex      = 1;
 
 // ─── Touch ────────────────────────────────────────────

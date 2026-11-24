@@ -19,8 +19,8 @@ bool loadWiFiConfig() {
     strlcpy(HOME_QUERY, p.getString("home_query", "").c_str(), sizeof(HOME_QUERY));
     needsGeocode = true;
   }
-  geoIndex = p.getInt("gfence_idx", 1);
-  if (geoIndex < 0 || geoIndex >= GEO_COUNT) geoIndex = 1;
+  geoIndex = p.getInt("gfence_idx", 0);
+  if (geoIndex < 0 || geoIndex >= GEO_COUNT) geoIndex = 0;   // Sky Dial: safe with 1 range
   GEOFENCE_KM = GEO_PRESETS[geoIndex];
   p.end();
   return true;

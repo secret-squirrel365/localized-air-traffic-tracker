@@ -381,14 +381,20 @@ int extractFlights(DynamicJsonDocument& doc) {
   JsonArray ac = doc["ac"].as<JsonArray>();
   int newCount = 0;
   for (JsonObject a : ac) {
-    if (newCount >= 20) break;
     float lat = a["lat"] | 0.0f;
     float lon = a["lon"] | 0.0f;
     int   alt = a["alt_baro"] | 0;
     if (alt < ALT_FLOOR_FT || lat == 0.0f) continue;
     float dist = haversineKm(HOME_LAT, HOME_LON, lat, lon);
     if (dist > GEOFENCE_KM) continue;
-    Flight& f = newFlights[newCount];
+    // Sky Dial: once 20 are stored, replace the farthest one if this plane is closer
+    int slot = newCount;
+    if (newCount >= 20) {
+      slot = 0;
+      for (int k = 1; k < 20; k++) if (newFlights[k].dist > newFlights[slot].dist) slot = k;
+      if (dist >= newFlights[slot].dist) continue;
+    }
+    Flight& f = newFlights[slot];
     memset(&f, 0, sizeof(Flight));
     const char* cs = a["flight"] | "";
     strlcpy(f.callsign, cs, sizeof(f.callsign));
@@ -406,7 +412,7 @@ int extractFlights(DynamicJsonDocument& doc) {
     f.dist  = dist;
     f.status = deriveStatus(alt, f.vs, dist);
     toUpperStr(f.callsign); toUpperStr(f.reg); toUpperStr(f.type);
-    newCount++;
+    if (newCount < 20) newCount++;
   }
   sortFlightsByDist(newFlights, newCount);
   return newCount;

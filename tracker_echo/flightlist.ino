@@ -88,7 +88,7 @@ void renderList() {
     tft.setTextSize(2); tft.setTextColor(C_GREEN, C_BG);
     tft.setCursor(16, CONTENT_Y + 60); tft.print("CLEAR SKIES");
     tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
-    tft.setCursor(16, CONTENT_Y + 86); tft.print("No planes in range. Tap GEO for more range.");
+    tft.setCursor(16, CONTENT_Y + 86); tft.printf("No planes within %d miles right now.", SKYDIAL_RANGE_MI);
     drawStatusBar();
     return;
   }
