@@ -563,7 +563,7 @@ void bootSequence() {
 #endif
   snprintf(buf, sizeof(buf), "%s:%d", PROXY_HOST, PROXY_PORT);
   bootLine("PROXY TARGET",   buf,                            C_AMBER,  25);
-  snprintf(buf, sizeof(buf), "%.4f, %.4f", HOME_LAT, HOME_LON);
+  snprintf(buf, sizeof(buf), "%s", (HOME_LAT != 0 || HOME_LON != 0) ? "SET (HIDDEN)" : "NOT SET");   // Sky Dial: privacy
   bootLine("HOME COORDS",    buf,                            C_AMBER,  25);
   snprintf(buf, sizeof(buf), "%.0f MI RADIUS", GEOFENCE_KM * 0.621371f);
   bootLine("GEOFENCE",       buf,                            C_AMBER,  20);

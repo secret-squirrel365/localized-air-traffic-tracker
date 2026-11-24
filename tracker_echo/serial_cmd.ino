@@ -2,7 +2,8 @@
 
 static void cmdHelp() {
   Serial.println("{\"cmd\":\"help\",\"commands\":[\"help\",\"heap\",\"state\",\"wifi\","
-                 "\"config\",\"diag\",\"fetch\",\"weather\",\"unknowns\",\"restart\"]}");
+                 "\"config\",\"diag\",\"fetch\",\"weather\",\"unknowns\",\"restart\","
+                 "\"calibrate\",\"touchtest\"]}");
 }
 
 static void cmdHeap() {
@@ -118,6 +119,16 @@ void checkSerialCmd() {
   else if (input == "fetch")    cmdFetch();
   else if (input == "weather")  cmdWeather();
   else if (input == "unknowns") cmdUnknowns();
+#if HAS_TOUCH
+  else if (input == "calibrate" || input == "touchtest") {   // Sky Dial: started from the PC
+    bool cal = (input == "calibrate");
+    Serial.printf("{\"cmd\":\"%s\",\"ok\":true,\"message\":\"look at the screen\"}\n", input.c_str());
+    Serial.println(">>>CMD_END<<<");
+    Serial.flush();
+    startTouchCalibration(cal);
+    return;
+  }
+#endif
   else if (input == "restart") {
     Serial.println("{\"cmd\":\"restart\",\"ok\":true}");
     Serial.println(">>>CMD_END<<<");

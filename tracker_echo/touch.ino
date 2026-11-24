@@ -17,14 +17,8 @@ void saveTouchCal() {
   p.end();
 }
 
-void initTouch() {
-  if (loadTouchCal()) {
-    tft.setTouchCalibrate(touchCalData);
-    touchReady = true;
-    Serial.println("Touch cal loaded.");
-    return;
-  }
-  // First boot — run on-screen calibration routine
+// Intro screen + the corner-cross taps (LovyanGFX), then save
+static void doTouchCalibration() {
   tft.fillScreen(C_BG);
   tft.fillRect(0, 0, W, HDR_H, C_AMBER);
   tft.setTextColor(C_BG, C_AMBER);
@@ -42,8 +36,93 @@ void initTouch() {
   delay(1200);
   tft.calibrateTouch(touchCalData, C_AMBER, C_BG, 15);
   saveTouchCal();
+  tft.setTouchCalibrate(touchCalData);
   touchReady = true;
   Serial.println("Touch calibrated and saved.");
+}
+
+void initTouch() {
+  if (loadTouchCal()) {
+    tft.setTouchCalibrate(touchCalData);
+    touchReady = true;
+    Serial.println("Touch cal loaded.");
+    return;
+  }
+  doTouchCalibration();   // first boot
+}
+
+// ─── Sky Dial: touch accuracy test ─────────────────────
+// Five + targets. Tap each one: a green dot shows where the board felt the
+// tap and the bottom line says how far off it was. Tap DONE (or wait 2 min).
+static void drawTestTarget(int x, int y) {
+  tft.drawFastHLine(x - 10, y, 21, C_AMBER);
+  tft.drawFastVLine(x, y - 10, 21, C_AMBER);
+  tft.drawCircle(x, y, 6, C_DIM);
+}
+
+static void runTouchTest() {
+  const int tx[5] = { 40, W - 40, W / 2, 40,     W - 40 };
+  const int ty[5] = { 80, 80,     H / 2, H - 60, H - 60 };
+  const int doneX = W / 2 - 50, doneY = H - 40, doneW = 100, doneH = 32;
+  tft.fillScreen(C_BG);
+  tft.fillRect(0, 0, W, HDR_H, C_AMBER);
+  tft.setTextColor(C_BG, C_AMBER); tft.setTextSize(2);
+  tft.setCursor(8, 6); tft.print("TOUCH TEST");
+  tft.setTextColor(C_DIM, C_BG); tft.setTextSize(1);
+  tft.setCursor(90, HDR_H + 8);  tft.print("Tap the center of each +. Green dot = where it landed.");
+  for (int i = 0; i < 5; i++) drawTestTarget(tx[i], ty[i]);
+  tft.fillRect(doneX, doneY, doneW, doneH, C_GREEN);
+  tft.setTextColor(C_BG, C_GREEN); tft.setTextSize(2);
+  tft.setCursor(doneX + (doneW - 48) / 2, doneY + 9); tft.print("DONE");
+
+  unsigned long last = millis();
+  bool wasDown = true;                                // ignore a press still held from calibration
+  while (millis() - last < 120000UL) {
+    uint16_t x, y;
+    bool down = tft.getTouch(&x, &y);
+    if (down && !wasDown) {
+      last = millis();
+      if (x >= doneX && x < doneX + doneW && y >= doneY && y < doneY + doneH) break;
+      int best = 0; long bestD = 0x7FFFFFFFL;
+      for (int i = 0; i < 5; i++) {
+        long dx = (long)x - tx[i], dy = (long)y - ty[i], d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = i; }
+      }
+      int off = (int)sqrtf((float)bestD);
+      tft.fillCircle(x, y, 3, off <= 8 ? C_GREEN : (off <= 16 ? C_YELLOW : C_RED));
+      char msg[64];
+      snprintf(msg, sizeof(msg), "Off by %d px  %s", off,
+               off <= 8 ? "(great)" : off <= 16 ? "(ok)" : "(re-run calibrate)");
+      tft.fillRect(80, doneY - 14, W - 160, 10, C_BG);     // clear old text, not the corner targets
+      tft.setTextColor(C_DIM, C_BG); tft.setTextSize(1);
+      tft.setCursor((W - (int)strlen(msg) * 6) / 2, doneY - 14); tft.print(msg);
+      Serial.printf("[TOUCH TEST] tap %d,%d  target %d  off %d px\n", x, y, best + 1, off);
+    }
+    wasDown = down;
+    delay(15);
+  }
+}
+
+// Put the normal screen back after calibrating / testing
+static void redrawAfterTouchTools() {
+  previousScreen = SCREEN_NONE;
+  tft.fillScreen(C_BG);
+  if (currentScreen == SCREEN_LIST)           renderList();
+  else if (currentScreen == SCREEN_WEATHER)   renderWeather();
+  else if (currentScreen == SCREEN_RADAR)     renderRadar();
+  else if (flightCount > 0)                   renderFlight(flights[flightIndex]);
+  else                                        renderNoAircraft();
+}
+
+// Started from the PC ("calibrate" or "touchtest" serial command).
+// These wait for taps, so the watchdog is paused for this task meanwhile.
+void startTouchCalibration(bool calibrate) {
+  esp_task_wdt_delete(NULL);
+  flagHide();
+  if (calibrate) doTouchCalibration();
+  runTouchTest();
+  esp_task_wdt_add(NULL);
+  redrawAfterTouchTools();
 }
 
 void handleTouch(uint16_t tx, uint16_t ty) {

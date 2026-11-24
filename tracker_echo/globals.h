@@ -137,6 +137,7 @@ void flagShow(int x, int y);
 void flagAnimate(unsigned long now);
 void flagHide();
 void renderNoAircraft();
+void startTouchCalibration(bool calibrate);   // Sky Dial: from the PC
 bool radarHandleTouch(uint16_t tx, uint16_t ty);
 void renderList();
 int  listHandleTouch(uint16_t tx, uint16_t ty);

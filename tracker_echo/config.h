@@ -20,6 +20,7 @@
 
 // ─── Sky Dial options ────────────────────────────────
 #define SKYDIAL_WEB_TRACK  0   // 1 = ask overheadtracker.com/track every refresh (pauses the screen)
+#define SKYDIAL_SHARE_DECIMALS 2  // privacy: decimals of your location sent to servers (2 = about 1/2 mile)
 #define SKYDIAL_RANGE_MI   15  // radar range in miles (fixed - no GEO button)
 #define SKYDIAL_GEO_BTN    0   // 1 = bring back the GEO range button
 #define SKYDIAL_BG_NET     1   // 1 = download on the second core (no screen pauses)

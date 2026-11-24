@@ -46,7 +46,31 @@ void saveGeoIndex() {
 }
 
 // ─── Geocoding (Nominatim) ────────────────────────────
+// Sky Dial: exact coordinates typed in setup ("29.4241, -98.4936") are used
+// as-is - no internet lookup, and much more accurate than a town name.
+static bool parseCoords(const char* q, float& la, float& lo) {
+  if (!strchr(q, '.')) return false;
+  if (sscanf(q, " %f , %f", &la, &lo) != 2 && sscanf(q, " %f %f", &la, &lo) != 2) return false;
+  return la >= -90 && la <= 90 && lo >= -180 && lo <= 180 && !(la == 0 && lo == 0);
+}
+
 bool geocodeLocation(const char* query) {
+  float la, lo;
+  if (parseCoords(query, la, lo)) {
+    HOME_LAT = la; HOME_LON = lo;
+    strlcpy(LOCATION_NAME, "HOME", sizeof(LOCATION_NAME));
+    Serial.printf("Location from coordinates: %.4f, %.4f\n", HOME_LAT, HOME_LON);
+    Preferences p;
+    p.begin("tracker", false);
+    p.putFloat("home_lat",  HOME_LAT);
+    p.putFloat("home_lon",  HOME_LON);
+    p.putString("home_name", LOCATION_NAME);
+    p.remove("home_query");
+    p.end();
+    HOME_QUERY[0] = '\0';
+    needsGeocode = false;
+    return true;
+  }
   char encoded[192];
   int j = 0;
   for (int i = 0; query[i] && j < (int)sizeof(encoded) - 1; i++) {
@@ -112,6 +136,11 @@ bool geocodeLocation(const char* query) {
 
 static void handleSetupRoot() {
   const char* locDefault = HOME_QUERY[0] ? HOME_QUERY : LOCATION_NAME;
+  static char coordBuf[40];   // Sky Dial: show saved coordinates instead of "HOME"
+  if (!HOME_QUERY[0] && strcmp(LOCATION_NAME, "HOME") == 0) {
+    snprintf(coordBuf, sizeof(coordBuf), "%.4f, %.4f", HOME_LAT, HOME_LON);
+    locDefault = coordBuf;
+  }
   static char page[2048];
   snprintf(page, sizeof(page),
     "<!DOCTYPE html><html><head>"
@@ -134,7 +163,9 @@ static void handleSetupRoot() {
     "<b>WI-FI PASSWORD</b>"
     "<input name='pass' type='password' placeholder='Password'>"
     "<b>LOCATION</b>"
-    "<input name='query' placeholder='e.g. Russell Lea, Sydney Airport' value='%s'>"
+    "<input name='query' placeholder='e.g. 29.4241, -98.4936' value='%s'>"
+    "<small style='color:#9a8'>Most accurate: your exact coordinates (from Google Maps). "
+    "A town name or ZIP code also works, but uses the town's center.</small>"
     "<button type='submit'>SAVE &amp; REBOOT</button>"
     "</form></body></html>",
     WIFI_SSID, locDefault);

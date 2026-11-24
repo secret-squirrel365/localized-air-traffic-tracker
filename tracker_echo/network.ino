@@ -72,8 +72,9 @@ static bool fetchFromProxy(char* buf, int maxLen) {
   }
   esp_task_wdt_reset();
   char url[160];
-  snprintf(url, sizeof(url), "https://%s/flights?lat=%.4f&lon=%.4f&radius=%d",
-           PROXY_HOST, HOME_LAT, HOME_LON, apiRadiusNm());
+  // Sky Dial privacy: servers only get a rounded location (about 1/2 mile)
+  snprintf(url, sizeof(url), "https://%s/flights?lat=%.*f&lon=%.*f&radius=%d",
+           PROXY_HOST, SKYDIAL_SHARE_DECIMALS, HOME_LAT, SKYDIAL_SHARE_DECIMALS, HOME_LON, apiRadiusNm());
   HTTPClient http;
   http.begin(tcp, url);
   http.setTimeout(12000);
@@ -171,9 +172,9 @@ static bool connectDirectAPI(HTTPClient& http, WiFiClientSecure& tlsClient) {
   const char* apiNames[] = { "adsb.lol", "airplanes.live" };
   char urls[2][160];
   snprintf(urls[0], sizeof(urls[0]),
-           "https://api.adsb.lol/v2/point/%.4f/%.4f/%d", HOME_LAT, HOME_LON, radius);
+           "https://api.adsb.lol/v2/point/%.*f/%.*f/%d", SKYDIAL_SHARE_DECIMALS, HOME_LAT, SKYDIAL_SHARE_DECIMALS, HOME_LON, radius);
   snprintf(urls[1], sizeof(urls[1]),
-           "https://api.airplanes.live/v2/point/%.4f/%.4f/%d", HOME_LAT, HOME_LON, radius);
+           "https://api.airplanes.live/v2/point/%.*f/%.*f/%d", SKYDIAL_SHARE_DECIMALS, HOME_LAT, SKYDIAL_SHARE_DECIMALS, HOME_LON, radius);
   for (int i = 0; i < 2; i++) {
     Serial.printf("[DIRECT] Trying %s...\n", apiNames[i]);
     http.begin(tlsClient, urls[i]);
@@ -549,8 +550,8 @@ static bool fetchWeatherInto(WeatherData& out) {
   esp_task_wdt_reset();
   if (!wifiOk()) { Serial.println("[WX] WiFi not connected"); return false; }
   char url[160];
-  snprintf(url, sizeof(url), "https://%s/weather?lat=%.4f&lon=%.4f",
-           PROXY_HOST, HOME_LAT, HOME_LON);
+  snprintf(url, sizeof(url), "https://%s/weather?lat=%.*f&lon=%.*f",
+           PROXY_HOST, SKYDIAL_SHARE_DECIMALS, HOME_LAT, SKYDIAL_SHARE_DECIMALS, HOME_LON);   // Sky Dial: rounded
 
   for (int attempt = 1; attempt <= 2; attempt++) {
     if (attempt > 1) { Serial.println("[WX] Retrying..."); delay(2000); esp_task_wdt_reset(); }
