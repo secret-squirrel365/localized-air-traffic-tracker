@@ -111,12 +111,12 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       tft.setTextColor(C_BG, C_AMBER);
       tft.setTextSize(2);
       tft.setCursor(GEO_BTN_X1 + 8, NAV_Y + 10);
-      tft.print(geoIndex == 0 ? "5km" : geoIndex == 1 ? "10km" : "20km");
+      tft.print(geoIndex == 0 ? "3mi" : geoIndex == 1 ? "6mi" : "12mi");
       // Sky Dial: removed 100 ms pause for snappier buttons
       geoIndex = (geoIndex + 1) % GEO_COUNT;
       GEOFENCE_KM = GEO_PRESETS[geoIndex];
       saveGeoIndex();
-      Serial.printf("Geofence: %.0f km\n", GEOFENCE_KM);
+      Serial.printf("Geofence: %.0f mi\n", GEOFENCE_KM * 0.621371f);
       drawNavBar();
       if (!isFetching) {
         flightCount = 0;

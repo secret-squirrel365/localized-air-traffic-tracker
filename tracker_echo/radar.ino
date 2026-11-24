@@ -372,6 +372,32 @@ static void panelPrint2(const char* s, int x, int& y, uint16_t col) {
   }
 }
 
+// Route in big text like the flight card: "From" city on one line,
+// "> To" city on the next (the server sends "San Antonio > Dallas").
+static void drawRadarRoute(const Flight& f, int x, int& y) {
+  const int maxChars = PANEL_W / 12;               // size-2 letters are 12 px wide
+  char from[24] = "", to[24] = "";
+  if (f.route[0]) {
+    const char* sep = strstr(f.route, " > ");
+    if (sep) {
+      int n = min((int)(sep - f.route), maxChars);
+      strlcpy(from, f.route, n + 1);
+      snprintf(to, sizeof(to), "> %s", sep + 3);
+    } else {
+      strlcpy(from, f.route, maxChars + 1);
+    }
+    to[min((int)strlen(to), maxChars)] = 0;
+  }
+  tft.setTextSize(2);
+  tft.setTextColor(f.route[0] ? C_YELLOW : C_DIMMER, C_BG);
+  tft.setCursor(x, y); tft.print(f.route[0] ? from : "NO ROUTE");
+  clrTo(x + PANEL_W, y, 16);
+  y += 18;
+  tft.setCursor(x, y); tft.print(to);
+  clrTo(x + PANEL_W, y, 16);
+  y += 18;
+}
+
 static void drawRadarPanel(bool full) {
   const int x = PANEL_X, x2 = PANEL_X + PANEL_W;
   int y = CONTENT_Y + 6;
@@ -401,8 +427,7 @@ static void drawRadarPanel(bool full) {
   y += 2;
   tft.drawFastHLine(x, y, PANEL_W, C_DIMMER); y += 6;
   panelPrint2(getAircraftTypeName(f.type), x, y, C_CYAN);
-  if (f.route[0]) panelPrint2(f.route, x, y, C_YELLOW);
-  else            panelPrint2("NO ROUTE DATA", x, y, C_DIMMER);
+  drawRadarRoute(f, x, y);
   y += 2;
   tft.drawFastHLine(x, y, PANEL_W, C_DIMMER); y += 6;
   char buf[24];
@@ -443,6 +468,21 @@ static void drawRadarPanel(bool full) {
   }
 }
 
+// Update just the "< 3/7 >" counter in the nav bar (no button redraw)
+static void drawRadarCounter() {
+  int x2 = LST_BTN_X1 - 2;
+  if (flightCount <= 1) { tft.fillRect(0, NAV_Y + 2, x2, NAV_H - 2, C_BG); return; }
+  char navBuf[16];
+  snprintf(navBuf, sizeof(navBuf), "< %d/%d >", flightIndex + 1, flightCount);
+  bool big = 8 + (int)strlen(navBuf) * 12 < LST_BTN_X1 - 4;
+  int ty = NAV_Y + (big ? 10 : 14);
+  tft.setTextSize(big ? 2 : 1);
+  tft.setTextColor(C_DIM, C_BG);
+  tft.setCursor(8, ty);
+  tft.print(navBuf);
+  clrTo(x2, ty, big ? 16 : 8);
+}
+
 // Sky Dial: full redraw only when arriving from another screen.
 // After that (new planes, next plane, taps) only the changing parts update.
 void renderRadar() {
@@ -457,6 +497,7 @@ void renderRadar() {
   drawScopeFrame();
   drawRadarPanel(full);
   if (full) drawStatusBar();
+  else      drawRadarCounter();
 }
 
 // Tap on the radar: select the nearest plane. Tap the panel: next plane.

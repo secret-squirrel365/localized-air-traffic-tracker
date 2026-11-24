@@ -63,7 +63,7 @@ void drawNavBar() {
   tft.print("WX");
 
   // GEO button
-  const char* geoLabels[] = {"5km", "10km", "20km"};
+  const char* geoLabels[] = {"3mi", "6mi", "12mi"};   // Sky Dial: miles
   tft.fillRect(GEO_BTN_X1, NAV_Y + 2, NAV_BTN_W, NAV_BTN_H, C_DIMMER);
   tft.setTextColor(C_AMBER, C_DIMMER);
   tft.setTextSize(2);
