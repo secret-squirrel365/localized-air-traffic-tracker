@@ -23,6 +23,9 @@
 #define SKYDIAL_RANGE_MI   15  // radar range in miles (fixed - no GEO button)
 #define SKYDIAL_GEO_BTN    0   // 1 = bring back the GEO range button
 #define SKYDIAL_BG_NET     1   // 1 = download on the second core (no screen pauses)
+#define SKYDIAL_FLAG       1   // 1 = waving US flag when no planes are in range (no extra memory)
+#define FLAG_W           180   // flag size in pixels
+#define FLAG_H            95
 #define SKYDIAL_SWEEP      1   // 1 = spinning radar sweep (uses ~26 KB of memory)
 #define SKYDIAL_HEARTBEAT  0   // 1 = send stats + town name to the Echo creator's server every minute
 

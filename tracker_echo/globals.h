@@ -132,6 +132,11 @@ void renderTrackFlight(const Flight& f);
 void renderRadar();
 void radarAnimate(unsigned long now);
 void radarPreload();
+void flagPreload();       // Sky Dial: waving flag
+void flagShow(int x, int y);
+void flagAnimate(unsigned long now);
+void flagHide();
+void renderNoAircraft();
 bool radarHandleTouch(uint16_t tx, uint16_t ty);
 void renderList();
 int  listHandleTouch(uint16_t tx, uint16_t ty);

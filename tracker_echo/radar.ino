@@ -409,12 +409,21 @@ static void drawRadarPanel(bool full) {
   panelShowsEmpty = empty;
   tft.drawFastVLine(PANEL_X - 6, CONTENT_Y + 4, CONTENT_H - 8, C_DIMMER);
   if (empty) {
-    if (!full) return;                              // already showing
+    if (!full) return;                              // already showing (flag keeps waving)
+#if SKYDIAL_FLAG
+    int fx = PANEL_X + (PANEL_W - FLAG_W) / 2 + 6, fy = CONTENT_Y + 40;
+    flagShow(fx, fy);
+    tft.setTextSize(2); tft.setTextColor(C_GREEN, C_BG);
+    tft.setCursor(PANEL_X + (PANEL_W - 11 * 12) / 2 + 6, fy + FLAG_H + 28); tft.print("CLEAR SKIES");
+    tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
+    tft.setCursor(PANEL_X + (PANEL_W - 26 * 6) / 2 + 6, fy + FLAG_H + 50); tft.print("Checking every 10 seconds.");
+#else
     tft.setTextSize(2); tft.setTextColor(C_GREEN, C_BG);
     tft.setCursor(x, y + 40); tft.print("CLEAR SKIES");
     tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
     tft.setCursor(x, y + 64); tft.print("No planes in range.");
     tft.setCursor(x, y + 76); tft.print("Checking every 10 seconds.");
+#endif
     return;
   }
   const Flight& f = flights[flightIndex];

@@ -8,7 +8,8 @@
 #define LIST_SCROLL_W 44                              // ▲/▼ column on the right
 #define LIST_SCROLL_X (W - LIST_SCROLL_W)
 
-static int listTop = 0;   // first row shown
+static int  listTop = 0;           // first row shown
+static bool listShowsEmpty = false; // Sky Dial: flag already on screen
 
 static void drawListArrow(int y, int h, bool up, bool enabled) {
   uint16_t bg = enabled ? C_DIMMER : C_BG;
@@ -77,18 +78,33 @@ static void drawListRow(int idx, int y) {
 }
 
 void renderList() {
-  if (previousScreen != SCREEN_LIST) drawHeader();
+  bool fresh = (previousScreen != SCREEN_LIST);
+  if (fresh) drawHeader();
   previousScreen = SCREEN_LIST;
   currentScreen  = SCREEN_LIST;
+  // Sky Dial: still empty and the flag is already up - leave it waving, no redraw
+  if (flightCount == 0 && !fresh && listShowsEmpty) return;
   drawNavBar();
   tft.fillRect(0, CONTENT_Y, W, CONTENT_H, C_BG);
+  listShowsEmpty = (flightCount == 0);
 
   if (flightCount == 0) {
     listTop = 0;
+#if SKYDIAL_FLAG
+    int fx = (W - FLAG_W) / 2 + 6, fy = CONTENT_Y + 40;
+    flagShow(fx, fy);
+    tft.setTextSize(2); tft.setTextColor(C_GREEN, C_BG);
+    tft.setCursor((W - 11 * 12) / 2, fy + FLAG_H + 24); tft.print("CLEAR SKIES");
+    tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
+    char msg[48];
+    snprintf(msg, sizeof(msg), "No planes within %d miles right now.", SKYDIAL_RANGE_MI);
+    tft.setCursor((W - (int)strlen(msg) * 6) / 2, fy + FLAG_H + 46); tft.print(msg);
+#else
     tft.setTextSize(2); tft.setTextColor(C_GREEN, C_BG);
     tft.setCursor(16, CONTENT_Y + 60); tft.print("CLEAR SKIES");
     tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
     tft.setCursor(16, CONTENT_Y + 86); tft.printf("No planes within %d miles right now.", SKYDIAL_RANGE_MI);
+#endif
     drawStatusBar();
     return;
   }

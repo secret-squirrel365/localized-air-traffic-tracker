@@ -61,7 +61,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
         if (radarPreferred) { renderRadar(); return; }
         currentScreen = SCREEN_FLIGHT;
         if (flightCount > 0) renderFlight(flights[flightIndex]);
-        else renderMessage("NO AIRCRAFT", "IN RANGE");
+        else renderNoAircraft();   // Sky Dial: with the waving flag
       } else {
         renderList();
       }
@@ -75,7 +75,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
         radarPreferred = false;
         currentScreen = SCREEN_FLIGHT;
         if (flightCount > 0) renderFlight(flights[flightIndex]);
-        else renderMessage("NO AIRCRAFT", "IN RANGE");
+        else renderNoAircraft();   // Sky Dial: with the waving flag
       } else {
         radarPreferred = true;
         lastCycle = millis();
@@ -96,7 +96,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
         if (radarPreferred && !trackingMode) { renderRadar(); return; }   // Sky Dial
         currentScreen = SCREEN_FLIGHT;
         if (flightCount > 0) renderFlight(flights[flightIndex]);
-        else renderMessage("NO AIRCRAFT", "IN RANGE");
+        else renderNoAircraft();   // Sky Dial: with the waving flag
       } else {
         currentScreen = SCREEN_WEATHER;
         renderWeather();

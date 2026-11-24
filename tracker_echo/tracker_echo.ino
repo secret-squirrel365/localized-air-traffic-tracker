@@ -420,6 +420,7 @@ void setup() {
   wxCountdown = wxOk ? WX_REFRESH_SECS : 60;
 #if HAS_TOUCH
   radarPreload();      // Sky Dial: load map + sweep memory early, before downloads start
+  flagPreload();       // Sky Dial: flag memory too
 #endif
   startNetTask();      // Sky Dial: from now on, downloads happen on the second core
 }
@@ -534,5 +535,6 @@ void loop() {
   handleFlightCycling(now);
 #if HAS_TOUCH
   radarAnimate(now);   // Sky Dial: spin the radar sweep
+  flagAnimate(now);    // Sky Dial: wave the flag when the sky is empty
 #endif
 }

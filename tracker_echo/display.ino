@@ -134,6 +134,9 @@ void drawStatusBar() {
 }
 
 void renderMessage(const char* line1, const char* line2) {
+#if HAS_TOUCH
+  flagHide();   // Sky Dial: don't let the flag draw over this message
+#endif
   tft.fillScreen(C_BG);
   previousScreen = SCREEN_NONE;
   drawHeader();
