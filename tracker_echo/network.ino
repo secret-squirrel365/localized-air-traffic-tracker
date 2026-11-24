@@ -413,13 +413,16 @@ int extractFlights(DynamicJsonDocument& doc) {
 }
 
 // ─── Main fetch orchestrator ───────────────────────────
-void fetchFlights() {
+// Sky Dial: split in two so the download can run on the second core.
+//   fetchFlightsCore()   — download + parse into newFlights. No drawing.
+//                          Returns count, -1 = no data, -2 = bad JSON.
+//   applyFlightsResult() — copy into flights[] and redraw (main core only).
+static int fetchFlightsCore(bool& fromCache) {
   logTs("FETCH", "Start (heap %d, maxblk %d)", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
-  isFetching = true;
   memset(newFlights, 0, sizeof(newFlights));
 
   int newCount = -1;
-  bool fromCache = false;
+  fromCache = false;
 
   if (wifiOk()) {
     int maxBlock = ESP.getMaxAllocHeap();
@@ -452,12 +455,21 @@ void fetchFlights() {
       dataSource = 2;
       Serial.println("Using cached data.");
     } else {
-      renderMessage("NO DATA", "ALL SOURCES FAILED");
-      isFetching = false;
-      return;
+      return -1;
     }
   }
+  if (newCount < 0) return -2;
+  for (int i = 0; i < newCount; i++) logFlight(newFlights[i]);
+  esp_task_wdt_reset();
+  return newCount;
+}
 
+static void applyFlightsResult(int newCount, bool fromCache) {
+  if (newCount == -1) {
+    renderMessage("NO DATA", "ALL SOURCES FAILED");
+    isFetching = false;
+    return;
+  }
   if (newCount < 0) {
     renderMessage("JSON ERROR", fromCache ? "CACHE CORRUPT" : "BAD RESPONSE");
     isFetching = false;
@@ -477,9 +489,6 @@ void fetchFlights() {
   }
   isFetching  = false;
   usingCache  = fromCache;
-
-  for (int i = 0; i < flightCount; i++) logFlight(flights[i]);
-  esp_task_wdt_reset();
 #if HAS_TOUCH
   if (currentScreen == SCREEN_LIST && !trackingMode) {
     renderList();    // Sky Dial: stay on the list, refreshed
@@ -498,8 +507,17 @@ void fetchFlights() {
   logTs("HEAP", "Free:%d MaxBlock:%d", ESP.getFreeHeap(), ESP.getMaxAllocHeap());
 }
 
-// ─── Parse weather JSON body into wxData ─────────────────
-static bool parseWeatherBody(const char* body) {
+// Old one-step way (used at start-up, and if the background task isn't running)
+void fetchFlights() {
+  isFetching = true;
+  bool fromCache = false;
+  int n = fetchFlightsCore(fromCache);
+  applyFlightsResult(n, fromCache);
+}
+
+// ─── Parse weather JSON body into a WeatherData ──────────
+// Sky Dial: fills `wxData` passed in, so the background task can use a copy.
+static bool parseWeatherBody(const char* body, WeatherData& wxData) {
   StaticJsonDocument<640> doc;
   if (deserializeJson(doc, body) != DeserializationError::Ok) return false;
   wxData.temp            = doc["temp"]            | 0.0f;
@@ -515,14 +533,13 @@ static bool parseWeatherBody(const char* body) {
   strlcpy(wxData.tide_time,     doc["tide_time"]     | "",    sizeof(wxData.tide_time));
   wxData.tide_height  = doc["tide_height"] | 0.0f;
   wxData.tide_is_high = (strcmp(doc["tide_type"] | "LOW", "HIGH") == 0);
-  wxReady = true;
   Serial.printf("[WX] %.1f C  %s  UV %.1f  TIDE %s %s\n",
     wxData.temp, wxData.condition, wxData.uv_index, wxData.tide_dir, wxData.tide_time);
   return true;
 }
 
 // ─── Fetch weather from proxy (Open-Meteo) ───────────────
-bool fetchWeather() {
+static bool fetchWeatherInto(WeatherData& out) {
   esp_task_wdt_reset();
   if (!wifiOk()) { Serial.println("[WX] WiFi not connected"); return false; }
   char url[160];
@@ -553,9 +570,102 @@ bool fetchWeather() {
     String body = http.getString();
     http.end();
     esp_task_wdt_reset();
-    if (parseWeatherBody(body.c_str())) return true;
+    if (parseWeatherBody(body.c_str(), out)) return true;
     Serial.printf("[WX] JSON parse error (attempt %d/2)\n", attempt);
   }
   Serial.println("[WX] All attempts failed");
   return false;
+}
+
+bool fetchWeather() {
+  bool ok = fetchWeatherInto(wxData);
+  if (ok) wxReady = true;
+  return ok;
+}
+
+// ─── Sky Dial: background downloads on the second core ───
+// The screen, sweep and touch keep running on core 1 while this task
+// downloads planes and weather on core 0. Results are handed over with
+// simple "ready" flags and picked up by netPoll() in loop().
+static TaskHandle_t  netTaskHandle       = nullptr;
+static volatile bool netWantFlights      = false;
+static volatile bool netWantWx           = false;
+static volatile bool netFlightsReady     = false;
+static volatile bool netWxReady          = false;
+static volatile int  netFlightsResult    = 0;
+static volatile bool netFlightsFromCache = false;
+static volatile bool netWxOk             = false;
+static WeatherData   netWxData;
+
+static void netTask(void*) {
+  esp_task_wdt_add(NULL);                       // watchdog also guards this task
+  for (;;) {
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+    esp_task_wdt_reset();
+    if (netWantFlights && !netFlightsReady) {
+      netWantFlights = false;
+      bool fc = false;
+      int n = fetchFlightsCore(fc);
+      netFlightsFromCache = fc;
+      netFlightsResult    = n;
+      netFlightsReady     = true;               // hand over to the main core
+    }
+    if (netWantWx && !netWxReady) {
+      netWantWx = false;
+      bool ok = fetchWeatherInto(netWxData);
+      netWxOk    = ok;
+      netWxReady = true;
+    }
+    esp_task_wdt_reset();
+  }
+}
+
+void startNetTask() {
+#if SKYDIAL_BG_NET
+  if (netTaskHandle) return;
+  if (xTaskCreatePinnedToCore(netTask, "skynet", 12288, nullptr, 1, &netTaskHandle, 0) != pdPASS) {
+    netTaskHandle = nullptr;
+    Serial.println("[NET] Could not start background task - using one-core mode");
+  } else {
+    Serial.printf("[NET] Background downloads running on core 0 (free heap %d)\n", ESP.getFreeHeap());
+  }
+#endif
+}
+
+// Ask for new plane data. Returns right away if the background task is running.
+void requestFlights() {
+  if (!netTaskHandle) { fetchFlights(); return; }
+  if (isFetching) return;
+  isFetching = true;
+  netWantFlights = true;
+  xTaskNotifyGive(netTaskHandle);
+}
+
+// Ask for new weather. Returns right away if the background task is running.
+void requestWeather() {
+  if (!netTaskHandle) {
+    bool ok = fetchWeather();
+    wxCountdown = ok ? WX_REFRESH_SECS : 60;
+    if (currentScreen == SCREEN_WEATHER) renderWeather();
+    return;
+  }
+  netWantWx = true;
+  xTaskNotifyGive(netTaskHandle);
+}
+
+// Called from loop(): pick up finished downloads and redraw (main core only).
+void netPoll() {
+  if (netFlightsReady) {
+    int  n  = netFlightsResult;
+    bool fc = netFlightsFromCache;
+    netFlightsReady = false;
+    applyFlightsResult(n, fc);
+  }
+  if (netWxReady) {
+    bool ok = netWxOk;
+    if (ok) { wxData = netWxData; wxReady = true; }
+    netWxReady = false;
+    wxCountdown = ok ? WX_REFRESH_SECS : 60;
+    if (currentScreen == SCREEN_WEATHER) renderWeather();
+  }
 }

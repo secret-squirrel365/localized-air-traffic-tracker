@@ -121,7 +121,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       if (!isFetching) {
         flightCount = 0;
         flightIndex = 0;
-        fetchFlights();
+        requestFlights();   // Sky Dial: background download
         countdown = REFRESH_SECS;
         lastCycle  = millis();
       }

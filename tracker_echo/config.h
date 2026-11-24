@@ -20,6 +20,8 @@
 
 // ─── Sky Dial options ────────────────────────────────
 #define SKYDIAL_WEB_TRACK  0   // 1 = ask overheadtracker.com/track every refresh (pauses the screen)
+#define SKYDIAL_BG_NET     1   // 1 = download on the second core (no screen pauses)
+#define SKYDIAL_SWEEP      1   // 1 = spinning radar sweep (uses ~26 KB of memory)
 #define SKYDIAL_HEARTBEAT  0   // 1 = send stats + town name to the Echo creator's server every minute
 
 // ─── Refresh ──────────────────────────────────────────

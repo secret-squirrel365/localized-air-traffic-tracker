@@ -1,6 +1,11 @@
 // ─── Sky Dial: Radar screen ─────────────────────────────
-// Draws a radar scope on the left (planes around home) and a
+// Radar scope on the left (outline map + planes + sweep) and a
 // flight info panel on the right. Tap a plane to select it.
+//
+// The scope is drawn into an off-screen 16-colour "sprite" first and then
+// copied to the screen in one go, so the spinning sweep doesn't flicker.
+// If there isn't enough memory for the sprite, it draws straight to the
+// screen instead (no sweep).
 #if HAS_TOUCH
 
 // Radar geometry (content area is y = CONTENT_Y .. H - FOOT_H)
@@ -11,10 +16,71 @@
 #define PANEL_W    (W - PANEL_X - 6)
 #define TAP_RADIUS 28          // big tap area for the stylus (pixels)
 
-#define C_RING     0x0320      // dim green rings
-#define C_RING_HI  0x05A0      // brighter green outer ring
+// Sprite that holds the scope (16 colours = 4 bits per pixel, ~26 KB)
+#define SPR_PAD    3
+#define SPR_SIZE   (RADAR_R * 2 + SPR_PAD * 2 + 1)
+#define SPR_C      (RADAR_R + SPR_PAD)               // centre inside the sprite
+#define SPR_X      (RADAR_CX - SPR_C)                // sprite position on screen
+#define SPR_Y      (RADAR_CY - SPR_C)
 
-// Turn a plane's lat/lon into a spot on the radar. North is up.
+#define SWEEP_FRAME_MS  50     // 20 frames per second
+#define SWEEP_STEP_DEG  6      // one full turn every 3 seconds
+#define SWEEP_TRAIL     30     // degrees of fading glow behind the line
+
+// Radar colours (RGB565)
+#define C_RING        0x0320   // dim green rings
+#define C_RING_HI     0x05A0   // brighter green outer ring
+#define C_SWEEP_MID   0x0500
+#define C_MAP_HWY     0x6180   // dim orange  — highways
+#define C_MAP_WATER   0x01F4   // dim blue    — rivers / lakes
+#define C_MAP_COUNTY  0x39E7   // grey        — county lines + city outline
+#define C_MAP_RWY     0xCE59   // light grey  — runways + airport labels
+
+// The 16 colours the sprite can use. Any other colour is drawn as the
+// closest one in this list.
+static const uint16_t PAL[16] = {
+  C_BG, C_RING, C_RING_HI, C_SWEEP_MID, C_GREEN, C_MAP_HWY, C_MAP_WATER, C_MAP_COUNTY,
+  C_MAP_RWY, C_DIM, C_CYAN, C_AMBER, C_ORANGE, C_RED, C_YELLOW, AL_MIL
+};
+
+static LGFX_Sprite radarSpr(&tft);
+static bool  sprTried = false, sprOk = false;
+static float sweepDeg = 0;
+
+static void initRadarSprite() {
+  sprTried = true;
+#if SKYDIAL_SWEEP
+  radarSpr.setColorDepth(4);
+  if (!radarSpr.createSprite(SPR_SIZE, SPR_SIZE)) {
+    Serial.printf("[RADAR] No memory for sweep sprite (free %d) - sweep off\n", ESP.getFreeHeap());
+    return;
+  }
+  radarSpr.createPalette();
+  for (int i = 0; i < 16; i++) {
+    uint16_t c = PAL[i];
+    radarSpr.setPaletteColor(i, ((c >> 11) & 0x1F) << 3, ((c >> 5) & 0x3F) << 2, (c & 0x1F) << 3);
+  }
+  sprOk = true;
+  Serial.printf("[RADAR] Sweep sprite ready (%d bytes, free heap %d)\n",
+                SPR_SIZE * SPR_SIZE / 2, ESP.getFreeHeap());
+#endif
+}
+
+// Colour for the current drawing target: palette index for the sprite,
+// the real colour for the screen.
+static uint16_t pc(uint16_t c565) {
+  if (!sprOk) return c565;
+  int r = (c565 >> 11) & 0x1F, g = (c565 >> 5) & 0x3F, b = c565 & 0x1F;
+  int best = 0; long bestD = 0x7FFFFFFFL;
+  for (int i = 0; i < 16; i++) {
+    int pr = (PAL[i] >> 11) & 0x1F, pg = (PAL[i] >> 5) & 0x3F, pb = PAL[i] & 0x1F;
+    long d = (long)(r - pr) * (r - pr) * 4 + (long)(g - pg) * (g - pg) + (long)(b - pb) * (b - pb) * 4;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+// Turn a plane's lat/lon into a spot on the screen. North is up.
 // Returns false if the plane is outside the circle.
 static bool radarProject(float lat, float lon, int& px, int& py) {
   float dxKm = (lon - HOME_LON) * 111.32f * cosf(HOME_LAT * DEG_TO_RAD);
@@ -27,15 +93,9 @@ static bool radarProject(float lat, float lon, int& px, int& py) {
   return true;
 }
 
-// ─── Sky Dial: outline map (skymap.bin on the SD card) ─────
-// Made on a PC by make_skymap.py. Kept in RAM (it's tiny) so drawing is fast.
+// ─── Outline map (skymap.bin on the SD card) ────────────
+// Made on a PC by tools/make_skymap.py. Kept in RAM (it's tiny).
 #define MAP_MAX_BYTES 16384
-#define C_MAP_HWY     0x6180   // dim orange  — highways
-#define C_MAP_WATER   0x01F4   // dim blue    — rivers / lakes
-#define C_MAP_COUNTY  0x39E7   // grey        — county lines
-#define C_MAP_CITY    0x318A   // blue-grey   — city outline
-#define C_MAP_RWY     0xCE59   // light grey  — runways
-#define C_MAP_APT     0x8C71   // grey        — airport labels
 
 static uint8_t* mapBuf   = nullptr;
 static size_t   mapLen   = 0;
@@ -68,7 +128,7 @@ static void loadSkyMap() {
 #endif
 }
 
-// Map point -> screen offset from the radar centre (uses the same math as planes)
+// Map point -> offset from the radar centre (same math as planes)
 static void mapPoint(const uint8_t* p, float kx, float ky, float& x, float& y) {
   int16_t dla, dlo;
   memcpy(&dla, p, 2); memcpy(&dlo, p + 2, 2);
@@ -97,13 +157,15 @@ static bool clipToCircle(float& x0, float& y0, float& x1, float& y1, float r) {
   return true;
 }
 
-static void drawSkyMap() {
+static void drawSkyMap(LovyanGFX& g, int cx, int cy) {
   if (!mapTried) loadSkyMap();
   if (!mapBuf) return;
   const float r  = RADAR_R - 1;
   const float sc = (float)RADAR_R / GEOFENCE_KM;
   const float kx = 111.32f * cosf(HOME_LAT * DEG_TO_RAD) * sc;
   const float ky = 110.57f * sc;
+  const uint16_t cHwy = pc(C_MAP_HWY), cWater = pc(C_MAP_WATER),
+                 cGrey = pc(C_MAP_COUNTY), cRwy = pc(C_MAP_RWY);
   size_t p = 16;
   for (uint16_t i = 0; i < mapCount && p + 2 <= mapLen; i++) {
     uint8_t type = mapBuf[p], n = mapBuf[p + 1];
@@ -122,20 +184,19 @@ static void drawSkyMap() {
       memcpy(lab, mapBuf + p, L); lab[L] = 0;
       p += len;
       if (x * x + y * y <= r * r) {
-        int px = RADAR_CX + (int)x, py = RADAR_CY + (int)y;
-        tft.fillRect(px - 1, py - 1, 3, 3, C_MAP_APT);
+        int px = cx + (int)x, py = cy + (int)y;
+        g.fillRect(px - 1, py - 1, 3, 3, cRwy);
         int lw = L * 6;
-        int edge = RADAR_CX + (int)sqrtf(fmaxf(r * r - y * y, 0.0f));
+        int edge = cx + (int)sqrtf(fmaxf(r * r - y * y, 0.0f));
         int lx = (px + 4 + lw > edge) ? px - 4 - lw : px + 4;   // keep label inside
-        tft.setTextSize(1);
-        tft.setTextColor(C_MAP_APT);                           // see-through text
-        tft.setCursor(lx, py - 3);
-        tft.print(lab);
+        g.setTextSize(1);
+        g.setTextColor(cRwy);                                   // see-through text
+        g.setCursor(lx, py - 3);
+        g.print(lab);
       }
       continue;
     }
-    uint16_t col = type == 1 ? C_MAP_HWY : type == 2 ? C_MAP_WATER :
-                   type == 3 ? C_MAP_COUNTY : type == 4 ? C_MAP_CITY : C_MAP_RWY;
+    uint16_t col = type == 1 ? cHwy : type == 2 ? cWater : type == 5 ? cRwy : cGrey;
     float x0, y0;
     mapPoint(mapBuf + p, kx, ky, x0, y0);
     for (uint8_t k = 1; k < n; k++) {
@@ -143,10 +204,10 @@ static void drawSkyMap() {
       mapPoint(mapBuf + p + 4 * k, kx, ky, x1, y1);
       float a0 = x0, b0 = y0, a1 = x1, b1 = y1;
       if (clipToCircle(a0, b0, a1, b1, r)) {
-        int sx0 = RADAR_CX + (int)a0, sy0 = RADAR_CY + (int)b0;
-        int sx1 = RADAR_CX + (int)a1, sy1 = RADAR_CY + (int)b1;
-        tft.drawLine(sx0, sy0, sx1, sy1, col);
-        if (type == 5) tft.drawLine(sx0 + 1, sy0, sx1 + 1, sy1, col);   // thicker runways
+        int sx0 = cx + (int)a0, sy0 = cy + (int)b0;
+        int sx1 = cx + (int)a1, sy1 = cy + (int)b1;
+        g.drawLine(sx0, sy0, sx1, sy1, col);
+        if (type == 5) g.drawLine(sx0 + 1, sy0, sx1 + 1, sy1, col);   // thicker runways
       }
       x0 = x1; y0 = y1;
     }
@@ -154,69 +215,136 @@ static void drawSkyMap() {
   }
 }
 
-static void drawRadarScope() {
-  // Range rings at 1/3, 2/3 and full range
-  tft.drawCircle(RADAR_CX, RADAR_CY, RADAR_R,         C_RING_HI);
-  tft.drawCircle(RADAR_CX, RADAR_CY, RADAR_R * 2 / 3, C_RING);
-  tft.drawCircle(RADAR_CX, RADAR_CY, RADAR_R / 3,     C_RING);
-  // Cross lines
-  tft.drawFastHLine(RADAR_CX - RADAR_R, RADAR_CY, RADAR_R * 2, C_RING);
-  tft.drawFastVLine(RADAR_CX, RADAR_CY - RADAR_R, RADAR_R * 2, C_RING);
-  // Compass letters
-  tft.setTextSize(1);
-  tft.setTextColor(C_GREEN, C_BG);
-  tft.setCursor(RADAR_CX - 2, RADAR_CY - RADAR_R + 3);  tft.print("N");
-  tft.setCursor(RADAR_CX - 2, RADAR_CY + RADAR_R - 10); tft.print("S");
-  tft.setCursor(RADAR_CX + RADAR_R - 9, RADAR_CY - 3);  tft.print("E");
-  tft.setCursor(RADAR_CX - RADAR_R + 4, RADAR_CY - 3);  tft.print("W");
-  // Range label (miles) at the outer ring
+// ─── Sweep ───────────────────────────────────────────────
+static void sweepPoint(int cx, int cy, float deg, int& x, int& y) {
+  float t = deg * DEG_TO_RAD;
+  x = cx + (int)(RADAR_R * sinf(t));
+  y = cy - (int)(RADAR_R * cosf(t));
+}
+
+// Faint glowing wedge behind the line (drawn under the map)
+static void drawSweepGlow(LovyanGFX& g, int cx, int cy) {
+  const int steps = 6;
+  for (int i = 0; i < steps; i++) {
+    float a0 = sweepDeg - (float)SWEEP_TRAIL * i / steps;
+    float a1 = sweepDeg - (float)SWEEP_TRAIL * (i + 1) / steps;
+    int x0, y0, x1, y1;
+    sweepPoint(cx, cy, a0, x0, y0);
+    sweepPoint(cx, cy, a1, x1, y1);
+    g.fillTriangle(cx, cy, x0, y0, x1, y1, pc(i < 2 ? C_SWEEP_MID : C_RING));
+  }
+}
+
+// Bright leading line (drawn over the map)
+static void drawSweepLine(LovyanGFX& g, int cx, int cy) {
+  int x, y;
+  sweepPoint(cx, cy, sweepDeg, x, y);
+  g.drawLine(cx, cy, x, y, pc(C_GREEN));
+  sweepPoint(cx, cy, sweepDeg - 1.5f, x, y);
+  g.drawLine(cx, cy, x, y, pc(C_RING_HI));
+}
+
+// ─── Scope pieces ────────────────────────────────────────
+static void drawRadarScope(LovyanGFX& g, int cx, int cy) {
+  uint16_t ring = pc(C_RING);
+  g.drawCircle(cx, cy, RADAR_R,         pc(C_RING_HI));
+  g.drawCircle(cx, cy, RADAR_R * 2 / 3, ring);
+  g.drawCircle(cx, cy, RADAR_R / 3,     ring);
+  g.drawFastHLine(cx - RADAR_R, cy, RADAR_R * 2, ring);
+  g.drawFastVLine(cx, cy - RADAR_R, RADAR_R * 2, ring);
+  g.setTextSize(1);
+  g.setTextColor(pc(C_GREEN));
+  g.setCursor(cx - 2, cy - RADAR_R + 3);  g.print("N");
+  g.setCursor(cx - 2, cy + RADAR_R - 10); g.print("S");
+  g.setCursor(cx + RADAR_R - 9, cy - 3);  g.print("E");
+  g.setCursor(cx - RADAR_R + 4, cy - 3);  g.print("W");
   char buf[12];
   snprintf(buf, sizeof(buf), "%.0f MI", GEOFENCE_KM * 0.621371f);
-  tft.setTextColor(C_DIM, C_BG);
-  tft.setCursor(RADAR_CX + 4, RADAR_CY - RADAR_R + 14);
-  tft.print(buf);
-  // Home
-  tft.fillCircle(RADAR_CX, RADAR_CY, 3, C_CYAN);
+  g.setTextColor(pc(C_DIM));
+  g.setCursor(cx + 4, cy - RADAR_R + 14);
+  g.print(buf);
+  g.fillCircle(cx, cy, 3, pc(C_CYAN));     // home
 }
 
 // Small arrow pointing the way the plane is flying
-static void drawPlaneIcon(int px, int py, int track, uint16_t col, bool selected) {
+static void drawPlaneIcon(LovyanGFX& g, int px, int py, int track, uint16_t col, bool selected) {
   if (track >= 0) {
     float t = track * DEG_TO_RAD;
     float s = sinf(t), c = cosf(t);
     int tipX = px + (int)(8 * s),            tipY = py - (int)(8 * c);
     int lX   = px + (int)(-5 * c - 5 * s),   lY   = py + (int)(-5 * s + 5 * c);
     int rX   = px + (int)( 5 * c - 5 * s),   rY   = py + (int)( 5 * s + 5 * c);
-    tft.fillTriangle(tipX, tipY, lX, lY, rX, rY, col);
-    // Heading line ahead of the plane
-    tft.drawLine(tipX, tipY, px + (int)(16 * s), py - (int)(16 * c), col);
+    g.fillTriangle(tipX, tipY, lX, lY, rX, rY, col);
+    g.drawLine(tipX, tipY, px + (int)(16 * s), py - (int)(16 * c), col);   // heading line
   } else {
-    tft.fillCircle(px, py, 3, col);
+    g.fillCircle(px, py, 3, col);
   }
-  if (selected) tft.drawCircle(px, py, 11, C_YELLOW);
+  if (selected) g.drawCircle(px, py, 11, pc(C_YELLOW));
 }
 
-static void drawRadarPlanes() {
+static void drawRadarPlanes(LovyanGFX& g, int cx, int cy) {
   for (int i = 0; i < flightCount; i++) {
     const Flight& f = flights[i];
-    int px, py;
-    if (!radarProject(f.lat, f.lon, px, py)) continue;
+    int sx, sy;
+    if (!radarProject(f.lat, f.lon, sx, sy)) continue;
+    int px = sx - RADAR_CX + cx, py = sy - RADAR_CY + cy;      // screen -> target coords
     bool emerg = strcmp(f.squawk,"7700")==0 || strcmp(f.squawk,"7600")==0 || strcmp(f.squawk,"7500")==0;
     bool mil = isMilitary(f);
     uint16_t col = emerg ? C_RED : (mil ? AL_MIL : statusColor(f.status));
     bool sel = (i == flightIndex);
-    drawPlaneIcon(px, py, f.track, col, sel);
-    // Callsign label next to the plane
-    tft.setTextSize(1);
-    tft.setTextColor(sel ? C_YELLOW : (mil ? AL_MIL : C_DIM), C_BG);
+    drawPlaneIcon(g, px, py, f.track, pc(col), sel);
+    g.setTextSize(1);
+    g.setTextColor(pc(sel ? C_YELLOW : (mil ? AL_MIL : C_DIM)));
     int lx = px + 9, ly = py + 6;
     int lw = (int)strlen(f.callsign) * 6;
-    if (lx + lw > RADAR_CX + RADAR_R) lx = px - 9 - lw;   // keep label inside the scope
-    tft.setCursor(lx, ly);
-    tft.print(f.callsign[0] ? f.callsign : "?");
+    if (lx + lw > cx + RADAR_R) lx = px - 9 - lw;            // keep label inside the scope
+    g.setCursor(lx, ly);
+    g.print(f.callsign[0] ? f.callsign : "?");
   }
 }
 
+// Draw the whole scope once. Uses the sprite (with sweep) if available.
+static void drawScopeFrame() {
+  if (!sprTried) initRadarSprite();
+  if (sprOk) {
+    radarSpr.fillSprite(0);                 // palette 0 = background
+    drawSweepGlow(radarSpr, SPR_C, SPR_C);
+    drawSkyMap(radarSpr, SPR_C, SPR_C);
+    drawRadarScope(radarSpr, SPR_C, SPR_C);
+    drawSweepLine(radarSpr, SPR_C, SPR_C);
+    drawRadarPlanes(radarSpr, SPR_C, SPR_C);
+    radarSpr.pushSprite(SPR_X, SPR_Y);
+  } else {
+    tft.fillRect(SPR_X, SPR_Y, SPR_SIZE, SPR_SIZE, C_BG);
+    drawSkyMap(tft, RADAR_CX, RADAR_CY);
+    drawRadarScope(tft, RADAR_CX, RADAR_CY);
+    drawRadarPlanes(tft, RADAR_CX, RADAR_CY);
+  }
+}
+
+// Load the map and grab the sweep memory at start-up, before downloads begin
+// (big memory blocks are easier to get early, and the SD card is free).
+void radarPreload() {
+  if (!mapTried) loadSkyMap();
+  if (!sprTried) initRadarSprite();
+}
+
+// Called from loop(): spins the sweep while the radar is on screen.
+void radarAnimate(unsigned long now) {
+#if SKYDIAL_SWEEP
+  static unsigned long lastFrame = 0;
+  if (currentScreen != SCREEN_RADAR || !sprOk) return;   // keeps spinning during downloads
+  if (now - lastFrame < SWEEP_FRAME_MS) return;
+  lastFrame = now;
+  sweepDeg += SWEEP_STEP_DEG;
+  if (sweepDeg >= 360) sweepDeg -= 360;
+  drawScopeFrame();
+#else
+  (void)now;
+#endif
+}
+
+// ─── Side panel ──────────────────────────────────────────
 // Print up to 2 lines of size-1 text inside the panel width
 static void panelPrint2(const char* s, int x, int& y, uint16_t col) {
   const int maxChars = PANEL_W / 6;
@@ -244,7 +372,6 @@ static void drawRadarPanel() {
     return;
   }
   const Flight& f = flights[flightIndex];
-  // Callsign + airline
   tft.setTextSize(3); tft.setTextColor(C_AMBER, C_BG);
   tft.setCursor(x, y); tft.print(f.callsign[0] ? f.callsign : "UNKNOWN");
   y += 26;
@@ -252,14 +379,11 @@ static void drawRadarPanel() {
   panelPrint2(al ? al->name : "UNKNOWN AIRLINE", x, y, al ? al->color : C_DIM);
   y += 2;
   tft.drawFastHLine(x, y, PANEL_W, C_DIMMER); y += 6;
-  // Aircraft type
   panelPrint2(getAircraftTypeName(f.type), x, y, C_CYAN);
-  // Route
   if (f.route[0]) panelPrint2(f.route, x, y, C_YELLOW);
   else            panelPrint2("NO ROUTE DATA", x, y, C_DIMMER);
   y += 2;
   tft.drawFastHLine(x, y, PANEL_W, C_DIMMER); y += 6;
-  // Altitude / speed / distance (US units)
   char buf[24];
   tft.setTextSize(1);
   tft.setTextColor(C_DIM, C_BG);
@@ -276,12 +400,11 @@ static void drawRadarPanel() {
   snprintf(buf, sizeof(buf), "%.1f MI", f.dist * 0.621371f);
   tft.setCursor(x + 160, y + 4); tft.print(buf);
   y += 24;
-  // Phase
   uint16_t sCol = statusColor(f.status);
   tft.fillRect(x, y, 4, 12, sCol);
   tft.setTextSize(1); tft.setTextColor(sCol, C_BG);
   tft.setCursor(x + 8, y + 2); tft.print(statusLabel(f.status));
-  if (isMilitary(f)) {   // MIL tag
+  if (isMilitary(f)) {
     tft.fillRect(x + PANEL_W - 30, y, 30, 12, AL_MIL);
     tft.setTextColor(C_BG, AL_MIL);
     tft.setCursor(x + PANEL_W - 24, y + 2); tft.print("MIL");
@@ -297,9 +420,7 @@ void renderRadar() {
   currentScreen  = SCREEN_RADAR;
   drawNavBar();
   tft.fillRect(0, CONTENT_Y, W, CONTENT_H, C_BG);
-  drawSkyMap();        // outline map underneath everything
-  drawRadarScope();
-  drawRadarPlanes();
+  drawScopeFrame();
   drawRadarPanel();
   drawStatusBar();
 }

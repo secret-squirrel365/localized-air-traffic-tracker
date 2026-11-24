@@ -417,6 +417,10 @@ void setup() {
   countdown = REFRESH_SECS;
   bool wxOk = fetchWeather();
   wxCountdown = wxOk ? WX_REFRESH_SECS : 60;
+#if HAS_TOUCH
+  radarPreload();      // Sky Dial: load map + sweep memory early, before downloads start
+#endif
+  startNetTask();      // Sky Dial: from now on, downloads happen on the second core
 }
 
 // ─── Loop helpers ─────────────────────────────────────
@@ -459,15 +463,14 @@ static void handlePeriodicTasks(unsigned long now) {
 #if SKYDIAL_WEB_TRACK
       fetchTrackStatus();
 #endif
-      if (!trackingMode) fetchFlights();
+      if (!trackingMode) requestFlights();   // Sky Dial: background download
       countdown = REFRESH_SECS;
       lastCycle = millis();
     }
   }
   if (wxCountdown <= 0) {
-    bool wxOk = fetchWeather();
-    wxCountdown = wxOk ? WX_REFRESH_SECS : 60;
-    if (currentScreen == SCREEN_WEATHER) renderWeather();
+    wxCountdown = WX_REFRESH_SECS;   // Sky Dial: netPoll() sets the real value when it's done
+    requestWeather();
   }
 }
 
@@ -525,6 +528,10 @@ void loop() {
     wasDown = down;
   }
 #endif
+  netPoll();           // Sky Dial: pick up finished background downloads
   handlePeriodicTasks(now);
   handleFlightCycling(now);
+#if HAS_TOUCH
+  radarAnimate(now);   // Sky Dial: spin the radar sweep
+#endif
 }

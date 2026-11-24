@@ -130,6 +130,8 @@ void renderTrackFlight(const Flight& f);
 // radar.ino (Sky Dial)
 #if HAS_TOUCH
 void renderRadar();
+void radarAnimate(unsigned long now);
+void radarPreload();
 bool radarHandleTouch(uint16_t tx, uint16_t ty);
 void renderList();
 int  listHandleTouch(uint16_t tx, uint16_t ty);
@@ -141,6 +143,10 @@ int extractFlights(DynamicJsonDocument& doc);
 void fetchFlights();
 void fetchTrackStatus();
 bool fetchWeather();
+void startNetTask();      // Sky Dial: background downloads
+void requestFlights();
+void requestWeather();
+void netPoll();
 void sendHeartbeat();
 
 // touch.ino
