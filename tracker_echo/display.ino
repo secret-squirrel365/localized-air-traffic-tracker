@@ -359,9 +359,9 @@ static void renderWxTempRow(int lx, int rx, int& cy, bool fresh) {
   tft.setTextSize(2);
   tft.setTextColor(C_AMBER, C_BG);
   char buf[32];
-  snprintf(buf, sizeof(buf), "%.1f C", wxData.temp);
+  snprintf(buf, sizeof(buf), "%.1f F", wxData.temp * 9.0f / 5.0f + 32.0f);  // Sky Dial: show Fahrenheit
   tft.setCursor(lx, cy); tft.print(buf);
-  snprintf(buf, sizeof(buf), "%.1f C", wxData.feels_like);
+  snprintf(buf, sizeof(buf), "%.1f F", wxData.feels_like * 9.0f / 5.0f + 32.0f);  // Sky Dial: show Fahrenheit
   tft.setCursor(rx, cy); tft.print(buf);
   cy += 20;
   tft.drawFastHLine(10, cy, W - 20, C_DIMMER); cy += 6;
