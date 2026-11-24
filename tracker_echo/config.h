@@ -18,6 +18,10 @@
   #define SD_CS 5
 #endif
 
+// ─── Sky Dial options ────────────────────────────────
+#define SKYDIAL_WEB_TRACK  0   // 1 = ask overheadtracker.com/track every refresh (pauses the screen)
+#define SKYDIAL_HEARTBEAT  0   // 1 = send stats + town name to the Echo creator's server every minute
+
 // ─── Refresh ──────────────────────────────────────────
 #define REFRESH_SECS          10
 #define TRACK_REFRESH_SECS     5
@@ -76,7 +80,7 @@
 
 // ─── Touch ────────────────────────────────────────────
 #if HAS_TOUCH
-  #define TOUCH_DEBOUNCE_MS  350
+  #define TOUCH_DEBOUNCE_MS  120   // Sky Dial: was 350 (taps now fire once per press)
   #define NAV_Y       HDR_H
   #define NAV_BTN_W   70
   #define NAV_BTN_H   (NAV_H - 4)
@@ -84,6 +88,7 @@
   #define CFG_BTN_X1  (W - NAV_BTN_W)
   #define GEO_BTN_X1  (CFG_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)
   #define WX_BTN_X1   (GEO_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)
+  #define RDR_BTN_X1  (WX_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)   // Sky Dial: radar button
 #endif
 
 // ─── Direct API robustness ────────────────────────────

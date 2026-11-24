@@ -464,14 +464,27 @@ void fetchFlights() {
     return;
   }
 
+  // Sky Dial: remember which plane was selected on the radar
+  char prevSel[12] = "";
+  if (radarPreferred && flightIndex < flightCount) strlcpy(prevSel, flights[flightIndex].callsign, sizeof(prevSel));
   memcpy(flights, newFlights, sizeof(Flight) * newCount);
   flightCount = newCount;
   flightIndex = 0;
+  if (prevSel[0]) {
+    for (int i = 0; i < flightCount; i++) {
+      if (strcmp(flights[i].callsign, prevSel) == 0) { flightIndex = i; break; }
+    }
+  }
   isFetching  = false;
   usingCache  = fromCache;
 
   for (int i = 0; i < flightCount; i++) logFlight(flights[i]);
   esp_task_wdt_reset();
+#if HAS_TOUCH
+  if (radarPreferred && !trackingMode && currentScreen != SCREEN_WEATHER) {
+    renderRadar();   // Sky Dial: stay on the radar (shows CLEAR SKIES if empty)
+  } else
+#endif
   if (flightCount == 0) {
     logTs("FETCH", "No flights, switching to weather");
     currentScreen = SCREEN_WEATHER;

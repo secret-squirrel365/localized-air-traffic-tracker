@@ -24,7 +24,7 @@ void drawNavBar() {
     tft.setTextColor(C_GREEN, C_BG);
     tft.setCursor(8, NAV_Y + 14);
     tft.print("SINGLE FLIGHT TRACKING MODE");
-  } else if (currentScreen == SCREEN_FLIGHT && flightCount > 1) {
+  } else if ((currentScreen == SCREEN_FLIGHT || currentScreen == SCREEN_RADAR) && flightCount > 1) {
     char navBuf[16];
     snprintf(navBuf, sizeof(navBuf), "< %d/%d >", flightIndex + 1, flightCount);
     tft.setTextSize(2);
@@ -32,6 +32,15 @@ void drawNavBar() {
     tft.setCursor(8, NAV_Y + 10);
     tft.print(navBuf);
   }
+
+  // RDR button (Sky Dial)
+  uint16_t rdrBg = (currentScreen == SCREEN_RADAR) ? C_GREEN : C_DIMMER;
+  uint16_t rdrFg = (currentScreen == SCREEN_RADAR) ? C_BG    : C_AMBER;
+  tft.fillRect(RDR_BTN_X1, NAV_Y + 2, NAV_BTN_W, NAV_BTN_H, rdrBg);
+  tft.setTextColor(rdrFg, rdrBg);
+  tft.setTextSize(2);
+  tft.setCursor(RDR_BTN_X1 + (NAV_BTN_W - 36) / 2, NAV_Y + 10);
+  tft.print("RDR");
 
   // WX button
   uint16_t wxBg = (currentScreen == SCREEN_WEATHER) ? C_CYAN : C_DIMMER;

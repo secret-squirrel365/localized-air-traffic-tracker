@@ -54,6 +54,22 @@ void handleTouch(uint16_t tx, uint16_t ty) {
   // ── Nav bar buttons ──
   if (ty >= NAV_Y && ty < NAV_Y + NAV_H) {
 
+    // RDR button (Sky Dial): switch between radar and flight cards
+    if (tx >= RDR_BTN_X1 && tx < RDR_BTN_X1 + NAV_BTN_W) {
+      if (trackingMode) return;
+      if (currentScreen == SCREEN_RADAR) {
+        radarPreferred = false;
+        currentScreen = SCREEN_FLIGHT;
+        if (flightCount > 0) renderFlight(flights[flightIndex]);
+        else renderMessage("NO AIRCRAFT", "IN RANGE");
+      } else {
+        radarPreferred = true;
+        lastCycle = millis();
+        renderRadar();
+      }
+      return;
+    }
+
     // WX button
     if (tx >= WX_BTN_X1 && tx < WX_BTN_X1 + NAV_BTN_W) {
       tft.fillRect(WX_BTN_X1, NAV_Y + 2, NAV_BTN_W, NAV_BTN_H, C_AMBER);
@@ -61,8 +77,9 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       tft.setTextSize(2);
       tft.setCursor(WX_BTN_X1 + (NAV_BTN_W - 24) / 2, NAV_Y + 10);
       tft.print("WX");
-      delay(100);
+      // Sky Dial: removed 100 ms pause for snappier buttons
       if (currentScreen == SCREEN_WEATHER) {
+        if (radarPreferred && !trackingMode) { renderRadar(); return; }   // Sky Dial
         currentScreen = SCREEN_FLIGHT;
         if (flightCount > 0) renderFlight(flights[flightIndex]);
         else renderMessage("NO AIRCRAFT", "IN RANGE");
@@ -81,7 +98,7 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       tft.setTextSize(2);
       tft.setCursor(GEO_BTN_X1 + 8, NAV_Y + 10);
       tft.print(geoIndex == 0 ? "5km" : geoIndex == 1 ? "10km" : "20km");
-      delay(100);
+      // Sky Dial: removed 100 ms pause for snappier buttons
       geoIndex = (geoIndex + 1) % GEO_COUNT;
       GEOFENCE_KM = GEO_PRESETS[geoIndex];
       saveGeoIndex();
@@ -128,6 +145,12 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       }
       return;
     }
+    return;
+  }
+
+  // ── Sky Dial: taps on the radar screen ──
+  if (ty >= CONTENT_Y && ty < (H - FOOT_H) && currentScreen == SCREEN_RADAR) {
+    if (radarHandleTouch(tx, ty)) { lastCycle = millis(); renderRadar(); }
     return;
   }
 

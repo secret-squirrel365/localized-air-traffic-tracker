@@ -89,6 +89,7 @@ uint32_t lastTouchMs     = 0;
 // ─── Screen mode ──────────────────────────────────────
 ScreenMode currentScreen  = SCREEN_NONE;
 ScreenMode previousScreen = SCREEN_NONE;
+bool       radarPreferred = false;   // Sky Dial
 
 // ─── Weather ──────────────────────────────────────────
 WeatherData wxData;
@@ -425,10 +426,12 @@ static void handlePeriodicTasks(unsigned long now) {
     lastDiagMs = now;
     diagReport();
   }
+#if SKYDIAL_HEARTBEAT
   if (now - lastHeartbeatMs >= HEARTBEAT_INTERVAL_MS) {
     lastHeartbeatMs = now;
     sendHeartbeat();
   }
+#endif
   if (now - lastTick < 1000) return;
   lastTick = now;
   wxCountdown--;
@@ -438,6 +441,7 @@ static void handlePeriodicTasks(unsigned long now) {
   }
   if ((currentScreen == SCREEN_FLIGHT || currentScreen == SCREEN_TRACK) &&
       flightCount > 0 && !isFetching) drawStatusBar();
+  if (currentScreen == SCREEN_RADAR && !isFetching) drawStatusBar();   // Sky Dial
   if (currentScreen == SCREEN_WEATHER) {
     time_t utcNow   = time(NULL);
     time_t localNow = (wxReady && wxData.utc_offset_secs != 0)
@@ -452,7 +456,9 @@ static void handlePeriodicTasks(unsigned long now) {
   } else {
     countdown--;
     if (countdown <= 0) {
+#if SKYDIAL_WEB_TRACK
       fetchTrackStatus();
+#endif
       if (!trackingMode) fetchFlights();
       countdown = REFRESH_SECS;
       lastCycle = millis();
@@ -472,6 +478,13 @@ static void handleFlightCycling(unsigned long now) {
     lastCycle = now;
     flightIndex = (flightIndex + 1) % flightCount;
     renderFlight(flights[flightIndex]);
+  }
+  // Sky Dial: on the radar, step the selected plane every cycle
+  if (!trackingMode && flightCount > 1 && currentScreen == SCREEN_RADAR &&
+      !isFetching && now - lastCycle >= (unsigned long)CYCLE_SECS * 1000) {
+    lastCycle = now;
+    flightIndex = (flightIndex + 1) % flightCount;
+    renderRadar();
   }
 #else
   if (!trackingMode && currentScreen == SCREEN_FLIGHT && flightCount > 0 &&
@@ -504,8 +517,12 @@ void loop() {
   if (Serial.available()) checkSerialCmd();
 #if HAS_TOUCH
   if (touchReady) {
+    // Sky Dial: act once when the stylus first presses down (not over and over while held)
+    static bool wasDown = false;
     uint16_t tx, ty;
-    if (tft.getTouch(&tx, &ty)) handleTouch(tx, ty);
+    bool down = tft.getTouch(&tx, &ty);
+    if (down && !wasDown) handleTouch(tx, ty);
+    wasDown = down;
   }
 #endif
   handlePeriodicTasks(now);

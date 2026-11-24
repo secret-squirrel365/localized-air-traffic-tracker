@@ -49,6 +49,7 @@ extern uint32_t lastTouchMs;
 // ─── Screen ───────────────────────────────────────────
 extern ScreenMode currentScreen;
 extern ScreenMode previousScreen;
+extern bool       radarPreferred;   // Sky Dial: user chose the radar view
 
 // ─── Weather ──────────────────────────────────────────
 extern WeatherData wxData;
@@ -124,6 +125,12 @@ void drawOtaProgress(int pct);
 void drawProgressBar(float progress, const char* dep, const char* arr);
 void drawTerritoryLine(const char* territory);
 void renderTrackFlight(const Flight& f);
+
+// radar.ino (Sky Dial)
+#if HAS_TOUCH
+void renderRadar();
+bool radarHandleTouch(uint16_t tx, uint16_t ty);
+#endif
 
 // network.ino
 int fetchAndParseDirectAPI();
