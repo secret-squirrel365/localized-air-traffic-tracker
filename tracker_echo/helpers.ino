@@ -30,6 +30,14 @@ const Airline* getAirline(const char* cs) {
   return nullptr;
 }
 
+// Sky Dial: military if the callsign or the aircraft type says so
+bool isMilitary(const Flight& f) {
+  const Airline* al = getAirline(f.callsign);
+  if (al && al->color == AL_MIL) return true;
+  const char* cat = getAircraftCategory(f.type);
+  return cat && strcmp(cat, "MILITARY") == 0;
+}
+
 const char* getAircraftTypeName(const char* code) {
   if (!code || !code[0]) return "---";
   for (int i = 0; i < AIRCRAFT_TYPE_COUNT; i++)

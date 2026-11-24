@@ -77,6 +77,7 @@
 #define AL_TEAL    0x0677   // #00CCBB  Air NZ, Fiji
 #define AL_SKY     0x455F   // #44AAFF  Korean, ANA, KLM, United
 #define AL_VIOLET  0xA33F   // #AA66FF  Thai, Hawaiian
+#define AL_MIL     0xADEA   // khaki    Military (Sky Dial)
 
 // ─── Touch ────────────────────────────────────────────
 #if HAS_TOUCH

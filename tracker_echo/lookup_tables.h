@@ -20,6 +20,19 @@ const Airline AIRLINES[] = {
   {"ALK","SRILANKAN",AL_GREEN},  {"ANG","AIR NIUGINI",AL_TEAL}, {"CAL","CHINA AIR",AL_ROSE},
   {"KLM","KLM",AL_SKY},          {"MXD","BATIK AIR",AL_RED},    {"UTY","ALLIANCE",AL_TEAL},
   {"AMX","AEROMEXICO",AL_SKY},   {"FRE","FLYPELICAN",C_AMBER},
+  // ── Sky Dial: US / Americas airlines & cargo ──
+  {"SWA","SOUTHWEST",AL_GOLD},   {"NKS","SPIRIT",AL_GOLD},      {"FFT","FRONTIER",AL_GREEN},
+  {"JBU","JETBLUE",AL_SKY},      {"SKW","SKYWEST",AL_SKY},      {"ENY","ENVOY",AL_SKY},
+  {"RPA","REPUBLIC",AL_SKY},     {"ASH","MESA",AL_SKY},         {"JIA","PSA AIRLINES",AL_SKY},
+  {"EDV","ENDEAVOR AIR",AL_SKY}, {"AAY","ALLEGIANT",AL_ORANGE}, {"SCX","SUN COUNTRY",AL_ORANGE},
+  {"MXY","BREEZE",AL_SKY},       {"FDX","FEDEX",AL_VIOLET},     {"UPS","UPS",AL_GOLD},
+  {"GTI","ATLAS AIR",C_AMBER},   {"ACA","AIR CANADA",AL_RED},   {"WJA","WESTJET",AL_TEAL},
+  {"VOI","VOLARIS",AL_VIOLET},   {"VIV","VIVA AEROBUS",AL_GREEN},{"CMP","COPA",AL_SKY},
+  {"AVA","AVIANCA",AL_RED},      {"EJA","NETJETS",C_AMBER},     {"LXJ","FLEXJET",C_AMBER},
+  {"CXK","ATP FLIGHT SCHOOL",C_AMBER},
+  // ── Sky Dial: US military callsigns ──
+  {"RCH","USAF - REACH",AL_MIL}, {"CNV","US NAVY",AL_MIL},     {"SAM","USAF - SPECIAL AIR",AL_MIL},
+  {"CMB","US TRANSCOM",AL_MIL},  {"PAT","US ARMY",AL_MIL},
 };
 const int AIRLINE_COUNT = sizeof(AIRLINES) / sizeof(AIRLINES[0]);
 
@@ -127,7 +140,13 @@ const AircraftType AIRCRAFT_TYPES[] = {
   {"A124","AN-124 Ruslan","MILITARY"}, {"H60","Black Hawk","MILITARY"},
   {"F18","F/A-18 Hornet","MILITARY"},  {"F35","F-35 Lightning","MILITARY"},
   {"EUFI","Eurofighter","MILITARY"},   {"A400","A400M Atlas","MILITARY"},
-  {"KC30","KC-30A MRTT","MILITARY"},   {"B190","Beech 1900","MILITARY"},
+  {"KC30","KC-30A MRTT","MILITARY"},   {"B190","Beech 1900","TURBOPROP"},  // Sky Dial: civil in the US
+  // Sky Dial: more US military types
+  {"T38","T-38 Talon","MILITARY"},     {"TEX2","T-6 Texan II","MILITARY"},
+  {"F16","F-16 Falcon","MILITARY"},    {"F15","F-15 Eagle","MILITARY"},
+  {"A10","A-10 Warthog","MILITARY"},   {"B52","B-52 Stratofort.","MILITARY"},
+  {"C5M","C-5M Galaxy","MILITARY"},    {"V22","V-22 Osprey","MILITARY"},
+  {"F22","F-22 Raptor","MILITARY"},
   // Helicopters
   {"EC35","H135","HELICOPTER"},     {"EC45","H145","HELICOPTER"},
   {"S76","Sikorsky S-76","HELICOPTER"},

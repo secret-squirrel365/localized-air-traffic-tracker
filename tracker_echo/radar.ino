@@ -75,12 +75,13 @@ static void drawRadarPlanes() {
     int px, py;
     if (!radarProject(f.lat, f.lon, px, py)) continue;
     bool emerg = strcmp(f.squawk,"7700")==0 || strcmp(f.squawk,"7600")==0 || strcmp(f.squawk,"7500")==0;
-    uint16_t col = emerg ? C_RED : statusColor(f.status);
+    bool mil = isMilitary(f);
+    uint16_t col = emerg ? C_RED : (mil ? AL_MIL : statusColor(f.status));
     bool sel = (i == flightIndex);
     drawPlaneIcon(px, py, f.track, col, sel);
     // Callsign label next to the plane
     tft.setTextSize(1);
-    tft.setTextColor(sel ? C_YELLOW : C_DIM, C_BG);
+    tft.setTextColor(sel ? C_YELLOW : (mil ? AL_MIL : C_DIM), C_BG);
     int lx = px + 9, ly = py + 6;
     int lw = (int)strlen(f.callsign) * 6;
     if (lx + lw > RADAR_CX + RADAR_R) lx = px - 9 - lw;   // keep label inside the scope
@@ -153,6 +154,11 @@ static void drawRadarPanel() {
   tft.fillRect(x, y, 4, 12, sCol);
   tft.setTextSize(1); tft.setTextColor(sCol, C_BG);
   tft.setCursor(x + 8, y + 2); tft.print(statusLabel(f.status));
+  if (isMilitary(f)) {   // MIL tag
+    tft.fillRect(x + PANEL_W - 30, y, 30, 12, AL_MIL);
+    tft.setTextColor(C_BG, AL_MIL);
+    tft.setCursor(x + PANEL_W - 24, y + 2); tft.print("MIL");
+  }
   y += 18;
   tft.setTextColor(C_DIMMER, C_BG);
   tft.setCursor(x, y); tft.print("Tap a plane to select it");
