@@ -345,25 +345,45 @@ void radarAnimate(unsigned long now) {
 }
 
 // ─── Side panel ──────────────────────────────────────────
-// Print up to 2 lines of size-1 text inside the panel width
+// Sky Dial: no-flicker panel. Every line sits in a fixed spot, text is
+// printed with its own background, and only the leftover space to the right
+// of the new text is cleared. Nothing on screen is ever wiped then redrawn.
+static bool panelShowsEmpty = true;
+
+// Clear from the text cursor to x2 on a row of height h
+static void clrTo(int x2, int y, int h) {
+  int cx = tft.getCursorX();
+  if (cx < x2) tft.fillRect(cx, y, x2 - cx, h, C_BG);
+}
+
+// Print text in exactly 2 size-1 lines (second line blanked if not needed)
 static void panelPrint2(const char* s, int x, int& y, uint16_t col) {
   const int maxChars = PANEL_W / 6;
   char line[48];
   tft.setTextSize(1);
   tft.setTextColor(col, C_BG);
-  int len = strlen(s);
-  for (int start = 0, n = 0; start < len && n < 2; n++) {
-    int take = min(maxChars, len - start);
+  int len = strlen(s), start = 0;
+  for (int n = 0; n < 2; n++) {
+    int take = max(0, min(maxChars, len - start));
     strlcpy(line, s + start, min((int)sizeof(line), take + 1));
     tft.setCursor(x, y); tft.print(line);
+    clrTo(x + PANEL_W, y, 8);
     y += 10; start += take;
   }
 }
 
-static void drawRadarPanel() {
-  int x = PANEL_X, y = CONTENT_Y + 6;
+static void drawRadarPanel(bool full) {
+  const int x = PANEL_X, x2 = PANEL_X + PANEL_W;
+  int y = CONTENT_Y + 6;
+  bool empty = (flightCount == 0);
+  if (full || empty != panelShowsEmpty) {          // only when the layout changes
+    tft.fillRect(PANEL_X - 2, CONTENT_Y, W - (PANEL_X - 2), CONTENT_H, C_BG);
+    full = true;
+  }
+  panelShowsEmpty = empty;
   tft.drawFastVLine(PANEL_X - 6, CONTENT_Y + 4, CONTENT_H - 8, C_DIMMER);
-  if (flightCount == 0) {
+  if (empty) {
+    if (!full) return;                              // already showing
     tft.setTextSize(2); tft.setTextColor(C_GREEN, C_BG);
     tft.setCursor(x, y + 40); tft.print("CLEAR SKIES");
     tft.setTextSize(1); tft.setTextColor(C_DIM, C_BG);
@@ -374,6 +394,7 @@ static void drawRadarPanel() {
   const Flight& f = flights[flightIndex];
   tft.setTextSize(3); tft.setTextColor(C_AMBER, C_BG);
   tft.setCursor(x, y); tft.print(f.callsign[0] ? f.callsign : "UNKNOWN");
+  clrTo(x2, y, 24);
   y += 26;
   const Airline* al = getAirline(f.callsign);
   panelPrint2(al ? al->name : "UNKNOWN AIRLINE", x, y, al ? al->color : C_DIM);
@@ -394,35 +415,48 @@ static void drawRadarPanel() {
   tft.setTextSize(2); tft.setTextColor(C_AMBER, C_BG);
   formatAlt(f.alt, buf, sizeof(buf));
   tft.setCursor(x, y); tft.print(buf);
+  clrTo(x + 78, y, 16);
   tft.setTextSize(1); tft.setTextColor(C_AMBER, C_BG);
   snprintf(buf, sizeof(buf), "%d MPH", (int)(f.speed * 1.15078f));
   tft.setCursor(x + 80, y + 4); tft.print(buf);
+  clrTo(x + 158, y + 4, 8);
   snprintf(buf, sizeof(buf), "%.1f MI", f.dist * 0.621371f);
   tft.setCursor(x + 160, y + 4); tft.print(buf);
+  clrTo(x2, y + 4, 8);
   y += 24;
   uint16_t sCol = statusColor(f.status);
   tft.fillRect(x, y, 4, 12, sCol);
   tft.setTextSize(1); tft.setTextColor(sCol, C_BG);
   tft.setCursor(x + 8, y + 2); tft.print(statusLabel(f.status));
+  clrTo(x2 - 32, y + 2, 8);
   if (isMilitary(f)) {
     tft.fillRect(x + PANEL_W - 30, y, 30, 12, AL_MIL);
     tft.setTextColor(C_BG, AL_MIL);
     tft.setCursor(x + PANEL_W - 24, y + 2); tft.print("MIL");
+  } else {
+    tft.fillRect(x + PANEL_W - 30, y, 30, 12, C_BG);
   }
   y += 18;
-  tft.setTextColor(C_DIMMER, C_BG);
-  tft.setCursor(x, y); tft.print("Tap a plane to select it");
+  if (full) {
+    tft.setTextColor(C_DIMMER, C_BG);
+    tft.setCursor(x, y); tft.print("Tap a plane to select it");
+  }
 }
 
+// Sky Dial: full redraw only when arriving from another screen.
+// After that (new planes, next plane, taps) only the changing parts update.
 void renderRadar() {
-  if (previousScreen != SCREEN_RADAR) drawHeader();
+  bool full = (previousScreen != SCREEN_RADAR);
   previousScreen = SCREEN_RADAR;
   currentScreen  = SCREEN_RADAR;
-  drawNavBar();
-  tft.fillRect(0, CONTENT_Y, W, CONTENT_H, C_BG);
+  if (full) {
+    drawHeader();
+    drawNavBar();
+    tft.fillRect(0, CONTENT_Y, W, CONTENT_H, C_BG);
+  }
   drawScopeFrame();
-  drawRadarPanel();
-  drawStatusBar();
+  drawRadarPanel(full);
+  if (full) drawStatusBar();
 }
 
 // Tap on the radar: select the nearest plane. Tap the panel: next plane.
