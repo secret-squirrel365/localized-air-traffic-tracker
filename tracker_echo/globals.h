@@ -131,6 +131,8 @@ void renderTrackFlight(const Flight& f);
 #if HAS_TOUCH
 void renderRadar();
 bool radarHandleTouch(uint16_t tx, uint16_t ty);
+void renderList();
+int  listHandleTouch(uint16_t tx, uint16_t ty);
 #endif
 
 // network.ino

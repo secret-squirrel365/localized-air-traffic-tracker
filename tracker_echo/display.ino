@@ -27,11 +27,22 @@ void drawNavBar() {
   } else if ((currentScreen == SCREEN_FLIGHT || currentScreen == SCREEN_RADAR) && flightCount > 1) {
     char navBuf[16];
     snprintf(navBuf, sizeof(navBuf), "< %d/%d >", flightIndex + 1, flightCount);
-    tft.setTextSize(2);
+    // Sky Dial: use small text if the counter would run into the LST button
+    bool big = 8 + (int)strlen(navBuf) * 12 < LST_BTN_X1 - 4;
+    tft.setTextSize(big ? 2 : 1);
     tft.setTextColor(C_DIM, C_BG);
-    tft.setCursor(8, NAV_Y + 10);
+    tft.setCursor(8, NAV_Y + (big ? 10 : 14));
     tft.print(navBuf);
   }
+
+  // LST button (Sky Dial)
+  uint16_t lstBg = (currentScreen == SCREEN_LIST) ? C_GREEN : C_DIMMER;
+  uint16_t lstFg = (currentScreen == SCREEN_LIST) ? C_BG    : C_AMBER;
+  tft.fillRect(LST_BTN_X1, NAV_Y + 2, NAV_BTN_W, NAV_BTN_H, lstBg);
+  tft.setTextColor(lstFg, lstBg);
+  tft.setTextSize(2);
+  tft.setCursor(LST_BTN_X1 + (NAV_BTN_W - 36) / 2, NAV_Y + 10);
+  tft.print("LST");
 
   // RDR button (Sky Dial)
   uint16_t rdrBg = (currentScreen == SCREEN_RADAR) ? C_GREEN : C_DIMMER;

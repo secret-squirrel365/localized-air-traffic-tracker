@@ -54,6 +54,20 @@ void handleTouch(uint16_t tx, uint16_t ty) {
   // ── Nav bar buttons ──
   if (ty >= NAV_Y && ty < NAV_Y + NAV_H) {
 
+    // LST button (Sky Dial): open / close the flight list
+    if (tx >= LST_BTN_X1 && tx < LST_BTN_X1 + NAV_BTN_W) {
+      if (trackingMode) return;
+      if (currentScreen == SCREEN_LIST) {
+        if (radarPreferred) { renderRadar(); return; }
+        currentScreen = SCREEN_FLIGHT;
+        if (flightCount > 0) renderFlight(flights[flightIndex]);
+        else renderMessage("NO AIRCRAFT", "IN RANGE");
+      } else {
+        renderList();
+      }
+      return;
+    }
+
     // RDR button (Sky Dial): switch between radar and flight cards
     if (tx >= RDR_BTN_X1 && tx < RDR_BTN_X1 + NAV_BTN_W) {
       if (trackingMode) return;
@@ -145,6 +159,14 @@ void handleTouch(uint16_t tx, uint16_t ty) {
       }
       return;
     }
+    return;
+  }
+
+  // ── Sky Dial: taps on the flight list ──
+  if (ty >= CONTENT_Y && ty < (H - FOOT_H) && currentScreen == SCREEN_LIST) {
+    int r = listHandleTouch(tx, ty);
+    if (r == 1) renderList();
+    else if (r == 2) { radarPreferred = true; lastCycle = millis(); renderRadar(); }
     return;
   }
 

@@ -441,7 +441,7 @@ static void handlePeriodicTasks(unsigned long now) {
   }
   if ((currentScreen == SCREEN_FLIGHT || currentScreen == SCREEN_TRACK) &&
       flightCount > 0 && !isFetching) drawStatusBar();
-  if (currentScreen == SCREEN_RADAR && !isFetching) drawStatusBar();   // Sky Dial
+  if ((currentScreen == SCREEN_RADAR || currentScreen == SCREEN_LIST) && !isFetching) drawStatusBar();   // Sky Dial
   if (currentScreen == SCREEN_WEATHER) {
     time_t utcNow   = time(NULL);
     time_t localNow = (wxReady && wxData.utc_offset_secs != 0)

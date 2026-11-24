@@ -90,6 +90,7 @@
   #define GEO_BTN_X1  (CFG_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)
   #define WX_BTN_X1   (GEO_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)
   #define RDR_BTN_X1  (WX_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)   // Sky Dial: radar button
+  #define LST_BTN_X1  (RDR_BTN_X1 - NAV_BTN_GAP - NAV_BTN_W)  // Sky Dial: list button
 #endif
 
 // ─── Direct API robustness ────────────────────────────

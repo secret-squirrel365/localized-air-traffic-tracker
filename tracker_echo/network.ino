@@ -481,7 +481,9 @@ void fetchFlights() {
   for (int i = 0; i < flightCount; i++) logFlight(flights[i]);
   esp_task_wdt_reset();
 #if HAS_TOUCH
-  if (radarPreferred && !trackingMode && currentScreen != SCREEN_WEATHER) {
+  if (currentScreen == SCREEN_LIST && !trackingMode) {
+    renderList();    // Sky Dial: stay on the list, refreshed
+  } else if (radarPreferred && !trackingMode && currentScreen != SCREEN_WEATHER) {
     renderRadar();   // Sky Dial: stay on the radar (shows CLEAR SKIES if empty)
   } else
 #endif
